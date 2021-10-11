@@ -1,66 +1,82 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <title>Vallog</title>
-  <meta name="description" content="サイトキャプションを入力">
-  <meta name="keywords" content="サイトキーワードを,で区切って入力">
-  <!--[if lt IE 9]>
-  <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-  <script src="http://css3-mediaqueries-js.googlecode.com/svn/trunk/css3-mediaqueries.js"></script>
-  <![endif]-->
-  <script src="/scripts/require-bundle.js"></script>
+  <head>
+    <meta charset="utf-8" />
+    <title>Vallog</title>
+    <meta name="description" content="サイトキャプションを入力" />
+    <meta name="keywords" content="サイトキーワードを,で区切って入力" />
+    <!--[if lt IE 9]>
+      <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+      <script src="http://css3-mediaqueries-js.googlecode.com/svn/trunk/css3-mediaqueries.js"></script>
+    <![endif]-->
+    <script src="/scripts/require-bundle.js"></script>
+    <script src="/scripts/codemirror/codemirror.js"></script>
+    <link rel="stylesheet" href="/scripts/codemirror/codemirror.css" />
+    <script src="/scripts/codemirror/javascript.js"></script>
   </head>
-  
+
   <body>
-  
-  <!----- メインコンテンツ ----->
-  <article>
-  <h1>Vallog Debugger</h1>
+    <!----- メインコンテンツ ----->
+    <article>
+      <h1>Vallog Debugger</h1>
 
-  <script src="/scripts/codemirror/codemirror.js"></script>
-  <link rel="stylesheet" href="/scripts/codemirror/codemirror.css">
-  <script src="/scripts/codemirror/javascript.js"></script>
+      <div style="display: flex">
+        <div style="width: 50%; margin: 1%">
+          Program
+          <textarea id="taCode" cols="50" rows="50"></textarea>
+          <div style="display: inline-block">
+            <button type="button" id="btnRun">Run program</button>
+          </div>
+          <div style="margin-top: 1%">
+            Output of program execution
+            <textarea
+              id="taConsole"
+              style="width: 100%; height: 200px; resize: none"
+              readonly="true"
+            ></textarea>
+            <button type="button" id="btnClear">
+              Clear output
+            </button>
+          </div>
+        </div>
+        <div style="width: 50%; margin: 1%">
+          <div>
+            Debug console
+            <textarea
+              id="taDebugConsole"
+              style="width: 100%; height: 500px; resize: none"
+              readonly="true"
+            ></textarea>
+          </div>
+          <div>
+            Query input
+            <input
+              id="queryInput"
+              type="text"
+              disabled
+              style="width: 100%"
+            />
+          </div>
+          <div>
+            <button type="button" id="btnStartDebug">
+              Start debug
+            </button>
+            <button
+              type="button"
+              id="btnEndDebug"
+              disabled
+            >
+              End debug
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+    <!----- メインコンテンツ END ----->
 
-  <div style="display: flex;">
-    <div style="width: 50%; margin: 1%;">
-      Program
-      <textarea id="taCode" cols="50" rows="50"></textarea>
-      <script>
-        var myCodeMirror = CodeMirror.fromTextArea(document.getElementById('taCode'), {
-          mode:  "javascript",
-          lineNumbers: true,
-        });
-      </script>
-      <div style="display: inline-block">
-        <button type="button" id="btnRun" onclick="runClicked();">Run program</button>
-      </div>
-      <div style="margin-top: 1%;">
-        Output of program execution
-        <textarea id="taConsole" style="width: 100%; height: 200px; resize: none;" readonly="true"></textarea>
-        <button type="button" id="btnClear" onclick="clearClicked();">Clear output</button>
-      </div>
-    </div>
-    <div style="width: 50%; margin: 1%;">
-      <div>
-        Debug console
-        <textarea id="taDebugConsole" style="width: 100%; height: 500px; resize: none;" readonly="true"></textarea>
-      </div>
-      <div>
-        Query input
-        <input id='input1' type='text' disabled onkeypress="keyPressed(event.keyCode);" style="width: 100%;">
-      </div>
-      <div>
-        <button type="button" id="btnStartDebug" onclick="startClicked();">Start debug</button>
-        <button type="button" id="btnEndDebug" disabled onclick="endClicked();">End debug</button>
-     </div>
-    </div>
-  </div>
-  </article>
-  <!----- メインコンテンツ END ----->
-  
-  <!--
+    <script src="/scripts/main.js"></script>
+
+    <!--
   <footer>フッター</footer>
-  -->
-  </body>
+  --></body>
 </html>
