@@ -6,11 +6,19 @@
     "start": "node ./bin/www"
   },
   "dependencies": {
+    "@babel/generator": "^7.15.8",
+    "@babel/parser": "^7.15.8",
+    "@babel/template": "^7.15.4",
+    "@babel/traverse": "^7.15.4",
+    "@babel/types": "^7.15.6",
+    "browserify": "^17.0.0",
+    "codemirror": "^5.63.1",
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",
     "express": "~4.16.1",
     "http-errors": "~1.6.3",
     "jade": "~1.11.0",
-    "morgan": "~1.9.1"
+    "morgan": "~1.9.1",
+    "sandbox": "^0.8.6"
   }
 }
