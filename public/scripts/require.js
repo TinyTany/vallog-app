@@ -6,5 +6,5 @@
     mod.babel_generator = require('@babel/generator');
     mod.babel_template = require('@babel/template');
     mod.babel_types = require('@babel/types');
-    mod.sandbox = require('sandbox');
+    mod.vm = require('vm');
 })();
