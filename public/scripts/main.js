@@ -14,16 +14,26 @@ let myCodeMirror = CodeMirror.fromTextArea(taCode, {
 
 btnRun.onclick = () => {
     const code = myCodeMirror.getValue();
+    // 標準出力先をすり替え
+    const log = console.log;
+    console.log = (...args) => {
+        log(...args);
+        taConsole.value += `> ${JSON.stringify(args[0])}\n`;
+    };
+    const error = console.error;
+    console.error = (...args) => {
+        error(...args);
+        taConsole.value += `> ${args[0]}\n`;
+    };
     try {
-        // let s = new window.modules.sandbox();
-        // s.run(code, (out) => {
-        //     taConsole.value += '> ' + out.console;
-        // });
-
+        window.modules.vm.runInNewContext(code, {console: console});
     }
     catch (e) {
         taConsole.value += e + '\n';
     }
+    // すり替えた標準出力を元に戻す
+    console.log = log;
+    console.error = error;
 };
 
 btnClear.onclick = () => {
@@ -37,7 +47,7 @@ queryInput.onkeydown = (e) => {
         taDebugConsole.value += `> ${command}\n`;
         let out;
         try {
-            out = eval(command);
+            out = window.modules.vm.runInNewContext(command, window.context);
         }
         catch (e) {
             out += e;
@@ -47,6 +57,7 @@ queryInput.onkeydown = (e) => {
 };
 
 btnStartDebug.onclick = () => {
+    window.context = {};
     myCodeMirror.setOption('readOnly', true);
     queryInput.removeAttribute('disabled');
     btnEndDebug.removeAttribute('disabled');
