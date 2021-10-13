@@ -3,29 +3,10 @@
 const taCode = document.getElementById('taCode');
 const btnRun = document.getElementById('btnRun');
 const btnClear = document.getElementById('btnClear');
-const taConsole = document.getElementById('taConsole');
+const divTermOut = document.getElementById('programOutput');
 const divTerminal = document.getElementById('terminal');
 const btnStartDebug = document.getElementById('btnStartDebug');
 const btnEndDebug = document.getElementById('btnEndDebug');
-
-// 標準出力すり替え用モジュール
-var ConsoleProxy = {};
-ConsoleProxy.log_original = console.log;
-ConsoleProxy.error_original = console.error;
-ConsoleProxy.set = (target, format) => {
-    console.log = (...args) => {
-        ConsoleProxy.log_original(...args);
-        target.value += format(args[0]);
-    };
-    console.error = (...args) => {
-        ConsoleProxy.error_original(...args);
-        target.value += format(args[0]);
-    };
-};
-ConsoleProxy.reset = () => {
-    console.log = ConsoleProxy.log_original;
-    console.error = ConsoleProxy.error_original;
-};
 
 // CodeMirrorの設定
 let myCodeMirror = CodeMirror.fromTextArea(taCode, {
@@ -33,7 +14,21 @@ let myCodeMirror = CodeMirror.fromTextArea(taCode, {
     lineNumbers: true
 });
 
-// xtermの設定
+// xtermの設定（プログラム実行出力）
+let termOut = new Terminal({
+    convertEol: true,
+    theme: {
+        background: '#1e1e1e',
+        foreground: '#d4d4d4',
+        cursor: '#1e1e1e',
+        cursorAccent: '#1e1e1e'
+    },
+    fontFamily: 'Ubuntu Mono, courier-new, courier, monospace',
+    fontSize: 16
+});
+termOut.open(divTermOut);
+
+// xtermの設定（デバッグコンソール）
 let term = new Terminal({
     convertEol: true,
     cursorBlink: true,
@@ -91,24 +86,35 @@ term.onKey(e => { // TODO: 矢印キーでカーソルが想定外に動かな�
     }
 });
 
-
 btnRun.onclick = () => {
     const code = myCodeMirror.getValue();
     // 標準出力先をすり替え
-    ConsoleProxy.set(taConsole, (s) => `> ${JSON.stringify(s)}\n`);
+    let log = console.log;
+    let error = console.error;
+    console.log = (...args) => {
+        log(...args);
+        let out = window.modules.util.inspect(args[0], { colors: true, depth: null });
+        termOut.writeln(out);
+    }
+    console.error = (...args) => {
+        error(...args);
+        let out = window.modules.util.inspect(args[0], { colors: true, depth: null });
+        termOut.writeln(out);
+    }
     // プログラム実行
     try {
         window.modules.vm.runInNewContext(code, {console: console});
     }
     catch (e) {
-        taConsole.value += e + '\n';
+        termOut.writeln(e.toString());
     }
     // すり替えた標準出力を元に戻す
-    ConsoleProxy.reset();
+    console.log = log;
+    console.error = error;
 };
 
 btnClear.onclick = () => {
-    taConsole.value = '';
+    termOut.clear();
 };
 
 btnStartDebug.onclick = () => {
