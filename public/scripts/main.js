@@ -35,7 +35,15 @@ let myCodeMirror = CodeMirror.fromTextArea(taCode, {
 
 // xtermの設定
 let term = new Terminal({
-    convertEol: true
+    convertEol: true,
+    cursorBlink: true,
+    theme: {
+        background: '#1e1e1e',
+        foreground: '#d4d4d4',
+        cursor: '#d4d4d4'
+    },
+    fontFamily: 'Ubuntu Mono, courier-new, courier, monospace',
+    fontSize: 16
 });
 term.open(divTerminal);
 term.prompt = () => {
