@@ -39,11 +39,12 @@ let term = new Terminal({
 });
 term.open(divTerminal);
 term.prompt = () => {
-    term.write('$ ');
+    term.write('\r\n$ ');
 };
 term.command = '';
 term.disabled = true;
-term.onKey(e => {
+// pasteに対応できるようにonDataのほうが良い
+term.onKey(e => { // TODO: 矢印キーでカーソルが想定外に動かないようにする
     if (term.disabled) {
         return;
     }
@@ -51,15 +52,19 @@ term.onKey(e => {
     const printable = !ev.altKey && !ev.ctrlKey && !ev.metaKey;
     // Enter
     if (ev.keyCode === 13) {
+        if (term.command == '') {
+            term.prompt();
+            return;
+        }
         let out = '\r\n';
         try {
-            out += window.modules.vm.runInNewContext(term.command, window.context);
+            let evaled = window.modules.vm.runInNewContext(term.command, window.context);
+            out += window.modules.util.inspect(evaled, { colors: true, depth: null });
         }
         catch (e) {
             out += e;
         }
-        console.log(out); // for debug
-        term.writeln(out);
+        term.write(out);
         term.command = '';
         term.prompt();
         return;
@@ -101,13 +106,13 @@ btnClear.onclick = () => {
 btnStartDebug.onclick = () => {
     term.reset();
     term.writeln('[info] Debug console activated')
-    term.writeln(`[info] Transpiling source program`);
+    term.writeln('[info] Transpiling source program');
     let program = transform(myCodeMirror.getValue());console.log(program);
     term.writeln('[info] Transpile success');
     term.writeln('[info] Running transpiled program');
     let vals = window.modules.vm.runInNewContext(program, {VALLOG: VALLOG, console: console});
     term.writeln('[info] Success');
-    term.writeln('[info] Ready\r\n');
+    term.writeln('[info] Ready');
     term.prompt();
     term.disabled = false;
     window.context = {vals: vals};
