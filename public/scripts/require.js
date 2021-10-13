@@ -7,4 +7,5 @@
     mod.babel_template = require('@babel/template');
     mod.babel_types = require('@babel/types');
     mod.vm = require('vm');
+    mod.util = require('util');
 })();
