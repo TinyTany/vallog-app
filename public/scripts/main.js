@@ -14,17 +14,39 @@ let myCodeMirror = CodeMirror.fromTextArea(taCode, {
     lineNumbers: true
 });
 
+// xtermのテーマ
+const xtermTheme = {
+    background: '#1e1e1e',
+    foreground: '#d4d4d4',
+    black: '#000000',
+    brightBlack: '#666666',
+    red: '#cd3131',
+    brightRed: '#f14c4c',
+    green: '#0dbc79',
+    brightGreen: '#23d18b',
+    yellow: '#e5e510',
+    brightYellow: '#f5f543',
+    blue: '#2472c8',
+    brightBlue: '#3b8eea',
+    magenta: '#bc3fbc',
+    brightMagenta: '#d670d6',
+    cyan: '#11a8cd',
+    brightCyan: '#29b8db',
+    white: '#e5e5e5',
+    brightWhite: '#e5e5e5'
+};
+
 // xtermの設定（プログラム実行出力）
 let termOut = new Terminal({
     convertEol: true,
     theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
+        ...xtermTheme,
         cursor: '#1e1e1e',
         cursorAccent: '#1e1e1e'
     },
-    fontFamily: 'Ubuntu Mono, courier-new, courier, monospace',
-    fontSize: 16
+    fontFamily: '"Cascadia Code", Menlo, monospace',
+    fontSize: 15,
+    RendererType: 'canvas'
 });
 termOut.open(divTermOut);
 
@@ -33,16 +55,16 @@ let term = new Terminal({
     convertEol: true,
     cursorBlink: true,
     theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
+        ...xtermTheme,
         cursor: '#d4d4d4'
     },
-    fontFamily: 'Ubuntu Mono, courier-new, courier, monospace',
-    fontSize: 16
+    fontFamily: '"Cascadia Code", Menlo, monospace',
+    fontSize: 15,
+    RendererType: 'canvas'
 });
 term.open(divTerminal);
 term.prompt = () => {
-    term.write('\r\n$ ');
+    term.write('\r\n\x1b[38;2;255;114;114m\u{276f}\x1b[0m ');
 };
 term.command = '';
 term.disabled = true;
