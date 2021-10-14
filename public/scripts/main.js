@@ -146,6 +146,7 @@ btnStartDebug.onclick = () => {
     let program = transform(myCodeMirror.getValue());console.log(program);
     term.writeln('[info] Transpile success');
     term.writeln('[info] Running transpiled program');
+    VALLOG.init();
     let vals = window.modules.vm.runInNewContext(program, {VALLOG: VALLOG, console: console});
     term.writeln('[info] Success');
     term.writeln('[info] Ready');
