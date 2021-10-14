@@ -25,7 +25,10 @@
       <div style="display: flex">
         <div style="width: 50%; margin: 1%">
           Program
-          <textarea id="taCode" cols="50" rows="50"></textarea>
+          <div style='position: relative;'>
+            <textarea id="taCode" cols="50" rows="50"></textarea>
+            <canvas id='canvas' style="position: absolute; top: 0; left: 0;"></canvas>
+          </div>
           <div style="display: inline-block">
             <button type="button" id="btnRun">Run program</button>
           </div>

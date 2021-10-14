@@ -164,3 +164,27 @@ btnEndDebug.onclick = () => {
     btnEndDebug.setAttribute('disabled', true);
     btnStartDebug.removeAttribute('disabled');
 };
+
+// 描画
+let canvas = document.getElementById('canvas');
+if (canvas.getContext) {
+    var ctx = canvas.getContext('2d');
+    let si = myCodeMirror.getScrollInfo();
+    canvas.width = si.width;
+    canvas.height = si.height
+    // canvasのサイズ確認用コード
+    {
+        // ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        // ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.moveTo(0, canvas.height);
+        ctx.lineTo(canvas.width, 0);
+        ctx.stroke();
+    }
+}
+else {
+    // canvas-unsupported code here
+}
