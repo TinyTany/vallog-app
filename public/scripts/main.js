@@ -77,6 +77,21 @@ term.historyIdx = -1; // 0-indexed
 term.cursorIdx = term.promptStr.length; // 0-indexed
 term.disabled = true;
 term.onData(e => {
+    // 起点位置から適切にカーソルを移動（マルチライン対応）
+    function moveCursor(moveCount) {
+        let moveR = moveCount % term.cols;
+        let moveD = Math.floor(moveCount / term.cols);
+        if (moveD == 0) {
+            term.write(`\x1b[u\x1b[${moveR}C`);
+        }
+        else if (moveR == 0) {
+            term.write(`\x1b[u\x1b[${moveD}B`);
+        }
+        else {
+            term.write(`\x1b[u\x1b[${moveD}B\x1b[${moveR}C`);
+        }
+    }
+
     if (term.disabled) {
         return;
     }
@@ -85,13 +100,15 @@ term.onData(e => {
             // コマンド部分の何文字目の上にカーソルがあるか（0-indexed）
             let idx = term.cursorIdx - term.promptStr.length;
             if (idx <= 0) {
-                term.write(`\x1b[1000D\x1b[${term.promptStr.length}C`);
+                // プロンプト記号だけでコンソールの列数を超えることは無いと想定
+                term.write(`\x1b[u\x1b[${term.promptStr.length}C`);
                 term.cursorIdx = term.promptStr.length;
                 return;
             }
             if (term.command.length < idx) {
-                term.write(`\x1b[1000D\x1b[${term.promptStr.length + term.command.length}C`);
-                term.cursorIdx = term.promptStr.length + term.command.length;
+                let moveCnt = term.promptStr.length + term.command.length;
+                moveCursor(moveCnt);
+                term.cursorIdx = moveCnt;
                 return;
             }
             // 以下、idxの範囲は[1, term.command.length]と仮定
@@ -104,9 +121,9 @@ term.onData(e => {
             else {
                 term.command = term.command.slice(0, idx - 1) + term.command.slice(idx);
             }
-            term.write('\x1b[1000D\x1b[0K');
+            term.write('\x1b[u\x1b[0J');
             term.prompt(term.command);
-            term.write(`\x1b[1000D\x1b[${term.promptStr.length + idx - 1}C`);
+            moveCursor(term.promptStr.length + idx - 1);
             term.cursorIdx--;
             return;
         }
@@ -132,9 +149,9 @@ term.onData(e => {
             else {
                 term.command = term.command.slice(0, idx) + e + term.command.slice(idx);
             }
-            term.write('\x1b[1000D\x1b[0K');
+            term.write('\x1b[u\x1b[0J');
             term.prompt(term.command);
-            term.write(`\x1b[1000D\x1b[${term.promptStr.length + idx + 1}C`);
+            moveCursor(term.promptStr.length + idx + 1);
             term.cursorIdx++;
             return;
         }
@@ -147,17 +164,32 @@ term.onKey(e => {
     const ev = e.domEvent;
     switch (ev.key) {
         case 'ArrowLeft': {
-            if (term.cursorIdx > term.promptStr.length) {
-                term.write('\x1b[D')
-                term.cursorIdx--;
+            if (term.cursorIdx <= term.promptStr.length) {
+                return;
             }
+            let curX = term.cursorIdx % term.cols;
+            let curY = Math.floor(term.cursorIdx / term.cols);
+            if (curY > 0 && curX == 0) {
+                term.write(`\x1b[A\x1b[${term.cols - 1}C`);
+            }
+            else {
+                term.write('\x1b[D')
+            }
+            term.cursorIdx--;
             return;
         }
         case 'ArrowRight': {
-            if (term.cursorIdx < term.promptStr.length + term.command.length) {
-                term.write('\x1b[C')
-                term.cursorIdx++;
+            if (term.cursorIdx >= term.promptStr.length + term.command.length) {
+                return;
             }
+            let curX = term.cursorIdx % term.cols;
+            if (curX == term.cols - 1) {
+                term.write(`\x1b[B\x1b[${term.cols - 1}D`);
+            }
+            else {
+                term.write('\x1b[C')
+            }
+            term.cursorIdx++;
             return;
         }
         case 'ArrowUp': {
@@ -168,7 +200,7 @@ term.onKey(e => {
                 return;
             }
             term.command = term.history[++term.historyIdx];
-            term.write('\x1b[1000D\x1b[0K');
+            term.write('\x1b[u\x1b[0J');
             term.prompt(term.command);
             term.cursorIdx = term.promptStr.length + term.command.length;
             return;
@@ -184,7 +216,7 @@ term.onKey(e => {
                 term.historyIdx = -1;
                 term.command = '';
             }
-            term.write('\x1b[1000D\x1b[0K');
+            term.write('\x1b[u\x1b[0J');
             term.prompt(term.command);
             term.cursorIdx = term.promptStr.length + term.command.length;
             return;
@@ -192,7 +224,7 @@ term.onKey(e => {
         case 'Enter': {
             term.historyIdx = -1;
             if (term.command == '') {
-                term.write('\r\n');
+                term.write('\r\n\x1b[s');
                 term.prompt();
                 return;
             }
@@ -209,7 +241,7 @@ term.onKey(e => {
             }
             term.write(out);
             term.command = '';
-            term.write('\r\n');
+            term.write('\r\n\x1b[s');
             term.prompt();
             term.cursorIdx = term.promptStr.length;
             return;
@@ -272,6 +304,7 @@ btnStartDebug.onclick = () => {
     let vals = window.modules.vm.runInNewContext(program, {VALLOG: VALLOG, console: console});
     term.writeln('[info] Success');
     term.writeln('[info] Ready');
+    term.write('\r\n\x1b[s');
     term.prompt();
     term.focus();
     term.disabled = false;
