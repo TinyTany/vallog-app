@@ -220,6 +220,7 @@ term.onKey(e => {
 });
 
 btnRun.onclick = () => {
+    termOut.clear();
     const code = myCodeMirror.getValue();
     // 標準出力先をすり替え
     let log = console.log;
@@ -255,7 +256,16 @@ btnStartDebug.onclick = () => {
     term.historyIdx = -1;
     term.writeln('[info] Debug console activated')
     term.writeln('[info] Transpiling source program');
-    let program = transform(myCodeMirror.getValue());console.log(program);
+    let program;
+    try {
+        program = transform(myCodeMirror.getValue());
+        console.log(program); // debug
+    }
+    catch (e) {
+        term.writeln(e.toString());
+        term.writeln('[error] Transpile failed');
+        return;
+    }
     term.writeln('[info] Transpile success');
     term.writeln('[info] Running transpiled program');
     VALLOG.init();
@@ -263,6 +273,7 @@ btnStartDebug.onclick = () => {
     term.writeln('[info] Success');
     term.writeln('[info] Ready');
     term.prompt();
+    term.focus();
     term.disabled = false;
     window.context = {vals: vals};
     myCodeMirror.setOption('readOnly', true);
