@@ -7,6 +7,7 @@ const divTermOut = document.getElementById('programOutput');
 const divTerminal = document.getElementById('terminal');
 const btnStartDebug = document.getElementById('btnStartDebug');
 const btnEndDebug = document.getElementById('btnEndDebug');
+const canvas = document.getElementById('canvas');
 
 // CodeMirrorの設定
 let myCodeMirror = CodeMirror.fromTextArea(taCode, {
@@ -322,26 +323,95 @@ btnEndDebug.onclick = () => {
     btnStartDebug.removeAttribute('disabled');
 };
 
-// 描画
-let canvas = document.getElementById('canvas');
-if (canvas.getContext) {
-    var ctx = canvas.getContext('2d');
-    let si = myCodeMirror.getScrollInfo();
-    canvas.width = si.width;
-    canvas.height = si.height
-    // canvasのサイズ確認用コード
-    {
-        // ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-        // ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(canvas.width, canvas.height);
-        ctx.moveTo(0, canvas.height);
-        ctx.lineTo(canvas.width, 0);
-        ctx.stroke();
+myCodeMirror.on('scroll', (cm) => {
+    draw();
+});
+
+let draw = () => {
+    let cm = myCodeMirror;
+    // 描画
+    if (!canvas.getContext) {
+        // canvas-unsupported code here
+        return;
     }
-}
-else {
-    // canvas-unsupported code here
+    var ctx = canvas.getContext('2d');
+    let si = cm.getScrollInfo();
+    //console.log(si); // debug
+    // エディタのクライアントサイズ（見えている部分のサイズ）をcanvasに設定
+    canvas.width = si.clientWidth;
+    canvas.height = si.clientHeight
+    // エディタの仮想サイズ確認用コード
+    {
+        const debug = false;
+        if (debug) {
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.moveTo(-si.left, -si.top);
+            ctx.lineTo(si.width - si.left, si.height - si.top);
+            ctx.moveTo(-si.left, si.height - si.top);
+            ctx.lineTo(si.width - si.left, -si.top);
+            ctx.stroke();
+        }
+    }
+    // 追跡値の経路描画
+    {
+        VALLOG.data.watchList.forEach(ls => {
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            if (ls.length == 0) {
+                return;
+            }
+            if (ls.length == 1) {
+                drawRect(ls[0]);
+                return;
+            }
+            for (let i = 0; i < ls.length - 1; ++i) {
+                drawArrow(ls[i], ls[i + 1]);
+            }
+        });
+
+        // loc: LocationPair
+        // return: {x, y}（矩形の中心の座標）
+        function drawRect(loc) {
+            // startとendは同じ行であることを想定
+            let sPos = cm.cursorCoords({line: loc.start.line - 1, ch: loc.start.char}, 'local');
+            let ePos = cm.cursorCoords({line: loc.end.line - 1, ch: loc.end.char}, 'local');
+            let x = sPos.left - si.left + 29 + 2; // TODO: マジックナンバーをやめる
+            let y = sPos.top - si.top;
+            let w = ePos.left - sPos.left;
+            let h = ePos.bottom - sPos.top;
+            ctx.strokeRect(x, y, w, h);
+            return {x: x + w / 2, y: y + h / 2};
+        }
+
+        // start, end: locationPair
+        function drawArrow(start, end) {
+            let gs = drawRect(start);
+            let ge = drawRect(end);
+            const theta = Math.PI / 6;
+            const arrowSize = 5;
+            let vec = {x: gs.x - ge.x, y: gs.y - ge.y};
+            let vec_len = Math.sqrt(vec.x * vec.x + vec.y * vec.y);
+            vec = {x: vec.x / vec_len * arrowSize, y: vec.y / vec_len * arrowSize};
+            let v1 = {
+                x: vec.x * Math.cos(theta) - vec.y * Math.sin(theta),
+                y: vec.x * Math.sin(theta) + vec.y * Math.cos(theta)
+            };
+            let v2 = {
+                x: vec.x * Math.cos(-theta) - vec.y * Math.sin(-theta),
+                y: vec.x * Math.sin(-theta) + vec.y * Math.cos(-theta)
+            };
+            ctx.beginPath();
+            ctx.moveTo(gs.x, gs.y);
+            ctx.lineTo(ge.x, ge.y);
+            ctx.lineTo(ge.x + v1.x, ge.y + v1.y);
+            ctx.moveTo(ge.x, ge.y);
+            ctx.lineTo(ge.x + v2.x, ge.y + v2.y);
+            ctx.stroke();
+        }
+    }
+};
+draw();
+
+    }
 }
