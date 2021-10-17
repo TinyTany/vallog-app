@@ -63,48 +63,159 @@ let term = new Terminal({
     RendererType: 'canvas'
 });
 term.open(divTerminal);
-term.prompt = () => {
-    term.write('\r\n\x1b[38;2;255;114;114m\u{276f}\x1b[0m ');
+term.promptStr = '\u{276f} ';
+term.prompt = (str) => {
+    if (!str) {
+        str = '';
+    }
+    term.write(`\x1b[38;2;255;114;114m${term.promptStr}\x1b[0m${str}`);
 };
 term.command = '';
+// 実行されたコマンドの履歴
+term.history = [];
+term.historyIdx = -1; // 0-indexed
+term.cursorIdx = term.promptStr.length; // 0-indexed
 term.disabled = true;
-// pasteに対応できるようにonDataのほうが良い
-term.onKey(e => { // TODO: 矢印キーでカーソルが想定外に動かないようにする
+term.onData(e => {
+    if (term.disabled) {
+        return;
+    }
+    switch (e) {
+        case '\u007f': { // Backspace
+            // コマンド部分の何文字目の上にカーソルがあるか（0-indexed）
+            let idx = term.cursorIdx - term.promptStr.length;
+            if (idx <= 0) {
+                term.write(`\x1b[1000D\x1b[${term.promptStr.length}C`);
+                term.cursorIdx = term.promptStr.length;
+                return;
+            }
+            if (term.command.length < idx) {
+                term.write(`\x1b[1000D\x1b[${term.promptStr.length + term.command.length}C`);
+                term.cursorIdx = term.promptStr.length + term.command.length;
+                return;
+            }
+            // 以下、idxの範囲は[1, term.command.length]と仮定
+            if (idx == 1) {
+                term.command = term.command.slice(1);
+            }
+            else if (idx == term.command.length) {
+                term.command = term.command.slice(0, term.command.length - 1);
+            }
+            else {
+                term.command = term.command.slice(0, idx - 1) + term.command.slice(idx);
+            }
+            term.write('\x1b[1000D\x1b[0K');
+            term.prompt(term.command);
+            term.write(`\x1b[1000D\x1b[${term.promptStr.length + idx - 1}C`);
+            term.cursorIdx--;
+            return;
+        }
+        default: {
+            if (!(String.fromCharCode(0x20) <= e && e <= String.fromCharCode(0x7e))) {
+                return;
+            }
+            // コマンド部分の何文字目の上にカーソルがあるか（0-indexed）
+            let idx = term.cursorIdx - term.promptStr.length;
+            if (idx < 0) {
+                idx = 0;
+            }
+            if (term.command.length < idx) {
+                idx = term.command.length;
+            }
+            // 以下、idxの範囲は[0, term.command.length]と仮定
+            if (idx == 0) {
+                term.command = e + term.command;
+            }
+            else if (idx == term.command.length) {
+                term.command = term.command + e;
+            }
+            else {
+                term.command = term.command.slice(0, idx) + e + term.command.slice(idx);
+            }
+            term.write('\x1b[1000D\x1b[0K');
+            term.prompt(term.command);
+            term.write(`\x1b[1000D\x1b[${term.promptStr.length + idx + 1}C`);
+            term.cursorIdx++;
+            return;
+        }
+    }
+});
+term.onKey(e => {
     if (term.disabled) {
         return;
     }
     const ev = e.domEvent;
-    const printable = !ev.altKey && !ev.ctrlKey && !ev.metaKey;
-    // Enter
-    if (ev.keyCode === 13) {
-        if (term.command == '') {
-            term.prompt();
+    switch (ev.key) {
+        case 'ArrowLeft': {
+            if (term.cursorIdx > term.promptStr.length) {
+                term.write('\x1b[D')
+                term.cursorIdx--;
+            }
             return;
         }
-        let out = '\r\n';
-        try {
-            let evaled = window.modules.vm.runInNewContext(term.command, window.context);
-            out += window.modules.util.inspect(evaled, { colors: true, depth: null });
+        case 'ArrowRight': {
+            if (term.cursorIdx < term.promptStr.length + term.command.length) {
+                term.write('\x1b[C')
+                term.cursorIdx++;
+            }
+            return;
         }
-        catch (e) {
-            out += e;
+        case 'ArrowUp': {
+            if (term.historyIdx == -1 && term.command != '') {
+                return;
+            }
+            if (term.historyIdx >= term.history.length - 1) {
+                return;
+            }
+            term.command = term.history[++term.historyIdx];
+            term.write('\x1b[1000D\x1b[0K');
+            term.prompt(term.command);
+            term.cursorIdx = term.promptStr.length + term.command.length;
+            return;
         }
-        term.write(out);
-        term.command = '';
-        term.prompt();
-        return;
-    }
-    // BackSpace
-    if (ev.keyCode === 8) {
-        if (term.command.length > 0) {
-            term.write('\b \b');
-            term.command = term.command.substr(0, term.command.length - 1);
+        case 'ArrowDown': {
+            if (term.historyIdx == -1 && term.command != '') {
+                return;
+            }
+            if (term.historyIdx > 0) {
+                term.command = term.history[--term.historyIdx];
+            }
+            else {
+                term.historyIdx = -1;
+                term.command = '';
+            }
+            term.write('\x1b[1000D\x1b[0K');
+            term.prompt(term.command);
+            term.cursorIdx = term.promptStr.length + term.command.length;
+            return;
         }
-        return;
-    }
-    if (printable) {
-        term.command += e.key;
-        term.write(e.key);
+        case 'Enter': {
+            term.historyIdx = -1;
+            if (term.command == '') {
+                term.write('\r\n');
+                term.prompt();
+                return;
+            }
+            if (term.history[0] != term.command) {
+                term.history.unshift(term.command);
+            }
+            let out = '\r\n';
+            try {
+                let evaled = window.modules.vm.runInNewContext(term.command, window.context);
+                out += window.modules.util.inspect(evaled, { colors: true, depth: null });
+            }
+            catch (e) {
+                out += e;
+            }
+            term.write(out);
+            term.command = '';
+            term.write('\r\n');
+            term.prompt();
+            term.cursorIdx = term.promptStr.length;
+            return;
+        }
+        default:
+            return;
     }
 });
 
@@ -141,6 +252,7 @@ btnClear.onclick = () => {
 
 btnStartDebug.onclick = () => {
     term.reset();
+    term.historyIdx = -1;
     term.writeln('[info] Debug console activated')
     term.writeln('[info] Transpiling source program');
     let program = transform(myCodeMirror.getValue());console.log(program);
