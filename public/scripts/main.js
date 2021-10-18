@@ -357,7 +357,8 @@ let draw = () => {
     {
         VALLOG.data.watchList.forEach(ls => {
             ctx.strokeStyle = 'red';
-            ctx.lineWidth = 2;
+            ctx.fillStyle = 'red';
+            ctx.lineWidth = 1;
             if (ls.length == 0) {
                 return;
             }
@@ -373,10 +374,12 @@ let draw = () => {
         // loc: LocationPair
         // return: {x, y}（矩形の中心の座標）
         function drawRect(loc) {
+            const element = document.getElementsByClassName('CodeMirror-linenumbers')[0];
+            const gutterWidth = element?.clientWidth ?? 0;
             // startとendは同じ行であることを想定
             let sPos = cm.cursorCoords({line: loc.start.line - 1, ch: loc.start.char}, 'local');
             let ePos = cm.cursorCoords({line: loc.end.line - 1, ch: loc.end.char}, 'local');
-            let x = sPos.left - si.left + 29 + 2; // TODO: マジックナンバーをやめる
+            let x = sPos.left - si.left + gutterWidth + 2; // HACK: マジックナンバーで座標調整
             let y = sPos.top - si.top;
             let w = ePos.left - sPos.left;
             let h = ePos.bottom - sPos.top;
@@ -389,7 +392,7 @@ let draw = () => {
             let gs = drawRect(start);
             let ge = drawRect(end);
             const theta = Math.PI / 6;
-            const arrowSize = 5;
+            const arrowSize = 7;
             let vec = {x: gs.x - ge.x, y: gs.y - ge.y};
             let vec_len = Math.sqrt(vec.x * vec.x + vec.y * vec.y);
             vec = {x: vec.x / vec_len * arrowSize, y: vec.y / vec_len * arrowSize};
@@ -404,10 +407,12 @@ let draw = () => {
             ctx.beginPath();
             ctx.moveTo(gs.x, gs.y);
             ctx.lineTo(ge.x, ge.y);
-            ctx.lineTo(ge.x + v1.x, ge.y + v1.y);
-            ctx.moveTo(ge.x, ge.y);
-            ctx.lineTo(ge.x + v2.x, ge.y + v2.y);
             ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(ge.x, ge.y);
+            ctx.lineTo(ge.x + v1.x, ge.y + v1.y);
+            ctx.lineTo(ge.x + v2.x, ge.y + v2.y);
+            ctx.fill();
         }
     }
 };
