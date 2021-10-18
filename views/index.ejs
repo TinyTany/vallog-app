@@ -27,7 +27,10 @@
           Program
           <div style='position: relative;'>
             <textarea id="taCode" cols="50" rows="50"></textarea>
-            <canvas id='canvas' style="position: absolute; top: 0; left: 0;"></canvas>
+            <canvas 
+              id='canvas' 
+              style="position: absolute; top: 0; left: 0; z-index: 999; pointer-events: none;"
+            ></canvas>
           </div>
           <div style="display: inline-block">
             <button type="button" id="btnRun">Run program</button>
