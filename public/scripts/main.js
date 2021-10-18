@@ -309,7 +309,7 @@ btnStartDebug.onclick = () => {
     term.prompt();
     term.focus();
     term.disabled = false;
-    window.context = {vals: vals};
+    window.context = {vals: vals, showTrace: showTrace};
     myCodeMirror.setOption('readOnly', true);
     btnEndDebug.removeAttribute('disabled');
     btnStartDebug.setAttribute('disabled', true);
@@ -413,5 +413,15 @@ let draw = () => {
 };
 draw();
 
+// for debug
+function showTrace(idx) {
+    let vals = VALLOG.data.vals;
+    if (idx < 0 || vals.length <= idx) {
+        throw 'Out of Range';
     }
+    let v = vals[idx].traces;
+    v = v.map(v => v.position.locationPair);
+    VALLOG.data.watchList = [];
+    VALLOG.data.watchList.push(v);
+    draw();
 }
