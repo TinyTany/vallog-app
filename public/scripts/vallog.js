@@ -18,11 +18,12 @@ VALLOG.init = () => {
     data.vals = [];
     data.refs = [];
     data.watchList = [];
+    cls.VallogId.init();
 };
 
 VALLOG.class.Location = class {
-    #line = 0; // Number
-    #char = 0; // Number
+    #line = 0; // Number(1-indexed)
+    #char = 0; // Number(0-indexed)
     constructor(line, char) {
         this.#line = line;
         this.#char = char;
@@ -73,6 +74,9 @@ VALLOG.class.VallogId = class {
     }
     get id() {
         return this.#id;
+    }
+    static init() {
+        cls.VallogId.#__id = 0;
     }
 };
 
