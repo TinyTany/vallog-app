@@ -336,6 +336,15 @@ let draw = () => {
     }
     var ctx = canvas.getContext('2d');
     let si = cm.getScrollInfo();
+    // 描画オフセット計算
+    let offset;
+    {
+        const element = document.getElementsByClassName('CodeMirror-linenumbers')[0];
+        const gutterWidth = element?.clientWidth ?? 0;
+        const offsetX = -si.left + gutterWidth + 2; // HACK: マジックナンバーで座標調整
+        const offsetY = -si.top;
+        offset = {x: offsetX, y: offsetY};
+    }
     //console.log(si); // debug
     // エディタのクライアントサイズ（見えている部分のサイズ）をcanvasに設定
     canvas.width = si.clientWidth;
@@ -345,12 +354,15 @@ let draw = () => {
         const debug = false;
         if (debug) {
             ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+            ctx.save()
+            ctx.translate(offset.x, offset.y);
             ctx.beginPath();
-            ctx.moveTo(-si.left, -si.top);
-            ctx.lineTo(si.width - si.left, si.height - si.top);
-            ctx.moveTo(-si.left, si.height - si.top);
-            ctx.lineTo(si.width - si.left, -si.top);
+            ctx.moveTo(0, 0);
+            ctx.lineTo(si.width, si.height);
+            ctx.moveTo(0, si.height);
+            ctx.lineTo(si.width, 0);
             ctx.stroke();
+            ctx.restore();
         }
     }
     // 追跡値の経路描画
@@ -363,7 +375,7 @@ let draw = () => {
                 return;
             }
             if (ls.length == 1) {
-                drawRect(ls[0]);
+                drawRegion(ls[0]);
                 return;
             }
             for (let i = 0; i < ls.length - 1; ++i) {
@@ -372,25 +384,107 @@ let draw = () => {
         });
 
         // loc: LocationPair
-        // return: {x, y}（矩形の中心の座標）
-        function drawRect(loc) {
-            const element = document.getElementsByClassName('CodeMirror-linenumbers')[0];
-            const gutterWidth = element?.clientWidth ?? 0;
-            // startとendは同じ行であることを想定
-            let sPos = cm.cursorCoords({line: loc.start.line - 1, ch: loc.start.char}, 'local');
-            let ePos = cm.cursorCoords({line: loc.end.line - 1, ch: loc.end.char}, 'local');
-            let x = sPos.left - si.left + gutterWidth + 2; // HACK: マジックナンバーで座標調整
-            let y = sPos.top - si.top;
-            let w = ePos.left - sPos.left;
-            let h = ePos.bottom - sPos.top;
-            ctx.strokeRect(x, y, w, h);
+        // return: {x, y}（オフセット込みの矩形の中心の座標）
+        function drawRegion(loc) {
+            let sl = loc.start.line - 1;
+            let el = loc.end.line - 1;
+            if (sl == el) {
+                return drawRect(loc);
+            }
+
+            // 各行の文字領域座標を計算
+            let rects = [];
+            for (let l = loc.start.line; l <= loc.end.line; ++l) {
+                let bch = beginCh(l);
+                let ech = endCh(l);
+                if (l == loc.start.line) {
+                    bch = loc.start.char;
+                }
+                if (l == loc.end.line) {
+                    ech = loc.end.char;
+                }
+                let sPos = cm.cursorCoords({line: l - 1, ch: bch}, 'local');
+                let ePos = cm.cursorCoords({line: l - 1, ch: ech}, 'local');
+                rects.push({sp: sPos, ep: ePos});
+            }
+
+            // 文字領域座標のx座標の最大・最小を計算
+            let minX = rects[0].sp.left;
+            let maxX = rects[0].ep.left;
+            rects.forEach(r => {
+                if (r.sp.left < minX) {
+                    minX = r.sp.left;
+                }
+                if (r.ep.left > maxX) {
+                    maxX = r.ep.left;
+                }
+            });
+            
+            // 描画処理
+            let fst = rects[0]
+            let lst = rects[rects.length - 1];
+            ctx.save();
+            ctx.translate(offset.x, offset.y);
+            ctx.beginPath();
+            ctx.moveTo(fst.sp.left, fst.sp.top);
+            ctx.lineTo(fst.sp.left, fst.sp.bottom);
+            if (fst.sp.left != minX) {
+                ctx.lineTo(minX, fst.sp.bottom);
+            }
+            ctx.lineTo(minX, lst.sp.bottom);
+            ctx.lineTo(lst.ep.left, lst.ep.bottom);
+            ctx.lineTo(lst.ep.left, lst.ep.top);
+            if (lst.ep.left != maxX) {
+                ctx.lineTo(maxX, lst.ep.top);
+            }
+            ctx.lineTo(maxX, fst.ep.top);
+            ctx.lineTo(fst.sp.left, fst.ep.top);
+            ctx.stroke();
+            ctx.restore();
+
+            // 領域の中心座標を計算
+            let x = minX + offset.x;
+            let y = fst.sp.top + offset.y;
+            let w = maxX - minX;
+            let h = lst.sp.bottom - fst.sp.top;
+
             return {x: x + w / 2, y: y + h / 2};
+
+            /*--- 補助関数 ---*/
+
+            // line: Number(1-indexed)
+            // return: Number(0-indexed)
+            function beginCh(line) {
+                let str = cm.getLine(line - 1);
+                return str.length - str.trimStart().length;
+            }
+
+            // line: Number(1-indexed)
+            // return: Number(0-indexed)
+            function endCh(line) {
+                let str = cm.getLine(line - 1);
+                return str.trimEnd().length;
+            }
+
+            // loc: LocationPair
+            // return: {x, y}（オフセット込みの矩形の中心の座標）
+            function drawRect(loc) {
+                // startとendは同じ行であることを想定
+                let sPos = cm.cursorCoords({line: loc.start.line - 1, ch: loc.start.char}, 'local');
+                let ePos = cm.cursorCoords({line: loc.end.line - 1, ch: loc.end.char}, 'local');
+                let x = sPos.left + offset.x; 
+                let y = sPos.top + offset.y;
+                let w = ePos.left - sPos.left;
+                let h = ePos.bottom - sPos.top;
+                ctx.strokeRect(x, y, w, h);
+                return {x: x + w / 2, y: y + h / 2};
+            }
         }
 
         // start, end: locationPair
         function drawArrow(start, end) {
-            let gs = drawRect(start);
-            let ge = drawRect(end);
+            let gs = drawRegion(start);
+            let ge = drawRegion(end);
             const theta = Math.PI / 6;
             const arrowSize = 7;
             let vec = {x: gs.x - ge.x, y: gs.y - ge.y};
