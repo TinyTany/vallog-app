@@ -160,7 +160,7 @@ function transform(program) {
                             types.numericLiteral(lhs.loc.end.column),
                             types.arrayExpression([]),
                             types.stringLiteral('_'),
-                            types.identifier('')
+                            types.identifier(lhs.name ?? '')
                         ]);
                     var seq = types.sequenceExpression([path.node, ast]);
                     path.replaceWith(seq);
