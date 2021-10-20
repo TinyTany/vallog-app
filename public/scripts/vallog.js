@@ -12,7 +12,7 @@ VALLOG.data.vals = []; // [Vallog]
 // 値追跡処理時に使用（一時的に追跡値に名前を付けて保持）
 VALLOG.data.refs = []; // [Vallog]
 // 観察対象の経路
-VALLOG.data.watchList = []; // [[LocationPair]]
+VALLOG.data.watchList = []; // [{loc: [LocationPair], color: string}]
 
 VALLOG.init = () => {
     data.vals = [];

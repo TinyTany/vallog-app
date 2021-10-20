@@ -311,6 +311,7 @@ btnStartDebug.onclick = () => {
     catch (e) {
         term.writeln(e.toString());
         term.writeln('[error] Transpile failed');
+        console.log(e); // debug
         return;
     }
     term.writeln('[info] Transpile success');
@@ -323,13 +324,23 @@ btnStartDebug.onclick = () => {
     term.prompt();
     term.focus();
     term.disabled = false;
-    window.context = {vals: vals, showTrace: showTrace};
+    window.context = {
+        vals: vals,
+        showTrace: showTrace,
+        showTraces: showTraces,
+        clear: () => { VALLOG.data.watchList = []; draw(); return 'OK'; }
+    };
     myCodeMirror.setOption('readOnly', true);
     btnEndDebug.removeAttribute('disabled');
     btnStartDebug.setAttribute('disabled', true);
 };
 
 btnEndDebug.onclick = () => {
+    // 描画の後始末
+    {
+        VALLOG.data.watchList = [];
+        draw();
+    }
     term.writeln('\r\n[info] Debug console terminated')
     term.disabled = true;
     myCodeMirror.setOption('readOnly', false);
@@ -391,10 +402,10 @@ let draw = () => {
     }
     // 追跡値の経路描画
     {
-        VALLOG.data.watchList.forEach(ls => {
-            ctx.strokeStyle = 'red';
-            ctx.fillStyle = 'red';
+        VALLOG.data.watchList.forEach(x => {
+            ctx.strokeStyle = ctx.fillStyle = x.color;
             ctx.lineWidth = 1;
+            let ls = x.loc;
             if (ls.length == 0) {
                 return;
             }
@@ -544,14 +555,35 @@ let draw = () => {
 draw();
 
 // for debug
-function showTrace(idx) {
+function showTrace(id) {
     let vals = VALLOG.data.vals;
-    if (idx < 0 || vals.length <= idx) {
-        throw 'Out of Range';
+    if (id < 0 || vals.length <= id) {
+        throw `Invalid index ${id}`;
     }
-    let v = vals[idx].traces;
+    let v = vals[id].traces;
     v = v.map(v => v.position.locationPair);
-    VALLOG.data.watchList = [];
-    VALLOG.data.watchList.push(v);
+    VALLOG.data.watchList.push({loc: v, color: getColor(id)});
     draw();
+    return 'OK';
+}
+
+function showTraces(ids) {
+    ids.forEach(id => {
+        showTrace(id);
+    });
+    return 'OK';
+}
+
+function getColor(i) {
+    const colors = [
+        'black',
+        'blue',
+        'fuchsia',
+        'green',
+        'maroon',
+        'navy',
+        'purple',
+        'red',
+    ];
+    return colors[i % colors.length];
 }
