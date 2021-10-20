@@ -3,7 +3,7 @@
 .CodeMirror {
   /* Set height, width, borders, and global font properties here */
   font-family: '"Cascadia Code", Menlo, monospace';
-  height: 300px;
+  height: 500px;
   color: #1e1e1e;
   direction: ltr;
   border: 1px solid black;

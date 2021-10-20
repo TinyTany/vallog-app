@@ -47,7 +47,8 @@ let termOut = new Terminal({
     },
     fontFamily: '"Cascadia Code", Menlo, monospace',
     fontSize: 15,
-    RendererType: 'canvas'
+    RendererType: 'canvas',
+    rows: 10
 });
 termOut.open(divTermOut);
 
