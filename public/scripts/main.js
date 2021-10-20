@@ -14,6 +14,19 @@ let myCodeMirror = CodeMirror.fromTextArea(taCode, {
     mode: 'javascript',
     lineNumbers: true
 });
+function changeFontSize(px) {
+    if (px <= 0) {
+        return;
+    }
+    let elm = document.getElementsByClassName('CodeMirror')[0];
+    if (elm?.style?.fontSize === undefined) {
+        return;
+    }
+    elm.style.fontSize = `${px}px`;
+    myCodeMirror.refresh();
+    draw();
+    return 'OK';
+}
 
 // xtermのテーマ
 const xtermTheme = {
@@ -329,24 +342,33 @@ myCodeMirror.on('scroll', (cm) => {
 });
 
 let draw = () => {
-    let cm = myCodeMirror;
     // 描画
     if (!canvas.getContext) {
         // canvas-unsupported code here
         return;
     }
-    var ctx = canvas.getContext('2d');
+    let ctx = canvas.getContext('2d');
+    let cm = myCodeMirror;
     let si = cm.getScrollInfo();
-    // 描画オフセット計算
+
     let offset;
+    let clip;
     {
+        // 描画オフセット計算
         const element = document.getElementsByClassName('CodeMirror-linenumbers')[0];
         const gutterWidth = element?.clientWidth ?? 0;
         const offsetX = -si.left + gutterWidth + 2; // HACK: マジックナンバーで座標調整
         const offsetY = -si.top;
         offset = {x: offsetX, y: offsetY};
+
+        // 描画領域クリッピング用の関数（行番号gutterの上に描画されないようにする）
+        // context.save()とcontext.restore()で挟んで使うことを想定
+        clip = () => {
+            // HACK: マジックナンバー...
+            ctx.rect(gutterWidth + 2, 0, si.clientWidth, si.clientHeight);
+            ctx.clip();
+        };
     }
-    //console.log(si); // debug
     // エディタのクライアントサイズ（見えている部分のサイズ）をcanvasに設定
     canvas.width = si.clientWidth;
     canvas.height = si.clientHeight
@@ -356,6 +378,7 @@ let draw = () => {
         if (debug) {
             ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
             ctx.save()
+            clip();
             ctx.translate(offset.x, offset.y);
             ctx.beginPath();
             ctx.moveTo(0, 0);
@@ -425,6 +448,7 @@ let draw = () => {
             let fst = rects[0]
             let lst = rects[rects.length - 1];
             ctx.save();
+            clip();
             ctx.translate(offset.x, offset.y);
             ctx.beginPath();
             ctx.moveTo(fst.sp.left, fst.sp.top);
@@ -477,12 +501,15 @@ let draw = () => {
                 let y = sPos.top + offset.y;
                 let w = ePos.left - sPos.left;
                 let h = ePos.bottom - sPos.top;
+                ctx.save();
+                clip();
                 ctx.strokeRect(x, y, w, h);
+                ctx.restore();
                 return {x: x + w / 2, y: y + h / 2};
             }
         }
 
-        // start, end: locationPair
+        // start, end: LocationPair
         function drawArrow(start, end) {
             let gs = drawRegion(start);
             let ge = drawRegion(end);
@@ -499,6 +526,8 @@ let draw = () => {
                 x: vec.x * Math.cos(-theta) - vec.y * Math.sin(-theta),
                 y: vec.x * Math.sin(-theta) + vec.y * Math.cos(-theta)
             };
+            ctx.save()
+            clip();
             ctx.beginPath();
             ctx.moveTo(gs.x, gs.y);
             ctx.lineTo(ge.x, ge.y);
@@ -508,6 +537,7 @@ let draw = () => {
             ctx.lineTo(ge.x + v1.x, ge.y + v1.y);
             ctx.lineTo(ge.x + v2.x, ge.y + v2.y);
             ctx.fill();
+            ctx.restore();
         }
     }
 };
