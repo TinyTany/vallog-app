@@ -1,8 +1,14 @@
-const parser = window.modules.babel_parser;//require('@babel/parser');
-const traverse = window.modules.babel_traverse;//require('@babel/traverse');
-const generate = window.modules.babel_generator;//require('@babel/generator');
-const template = window.modules.babel_template;//require('@babel/template');
-const types = window.modules.babel_types;//require('@babel/types');
+const parser = window.modules.babel_parser;
+const traverse = window.modules.babel_traverse;
+const generate = window.modules.babel_generator;
+const template = window.modules.babel_template;
+const types = window.modules.babel_types;
+
+// const parser = require('@babel/parser');
+// const traverse = require('@babel/traverse');
+// const generate = require('@babel/generator');
+// const template = require('@babel/template');
+// const types = require('@babel/types');
 
 var my_id = 0;
 function getId() {
@@ -39,6 +45,7 @@ function transform(program) {
                     path.get('params').forEach(p => p.mySkip = true);
                     return;
                 }
+                case 'LogicalExpression':
                 case 'BinaryExpression': {
                     debugLog(`binexp enter(${path.node.operator})`);
                     path.node.left.getValMode = true;
@@ -63,8 +70,6 @@ function transform(program) {
                     if (!path.node.init) {
                         return;
                     }
-                    // 右辺の値に、左辺の変数名を付与
-                    path.node.init.varName = path.node.id.name;
                     return;
                 }
                 case 'MemberExpression': {
@@ -90,8 +95,6 @@ function transform(program) {
                 }
                 case 'AssignmentExpression': {
                     path.node.left.noVallogize = true;
-                    // 右辺の値に、左辺の変数名を付与
-                    path.node.right.varName = path.node.left.name;
                     return;
                 }
                 case 'ExpressionStatement': {
@@ -136,11 +139,40 @@ function transform(program) {
                     path.node.relId = id;
                     return;
                 }
+                case 'VariableDeclarator': {
+                    var lhs = path.node.id;
+                    var ast = PassExpAst(lhs.name, lhs.loc, '[]');
+                    var node = types.variableDeclarator(types.identifier('__dummy'), ast);
+                    path.insertAfter(node);
+                    path.getSibling(path.key + 1).mySkip = true;
+                    return;
+                }
+                case 'AssignmentExpression': {
+                    // HACK: 副作用を起こすgetterに対して不適切な実装
+                    var lhs = path.node.left;
+                    var ast = types.callExpression(
+                        types.identifier(`__pass`),
+                        [
+                            lhs,
+                            types.numericLiteral(lhs.loc.start.line),
+                            types.numericLiteral(lhs.loc.start.column),
+                            types.numericLiteral(lhs.loc.end.line),
+                            types.numericLiteral(lhs.loc.end.column),
+                            types.arrayExpression([]),
+                            types.stringLiteral('_'),
+                            types.identifier('')
+                        ]);
+                    var seq = types.sequenceExpression([path.node, ast]);
+                    path.replaceWith(seq);
+                    path.mySkip = true;
+                    return;
+                }
+                case 'LogicalExpression':
                 case 'BinaryExpression': {
                     var id = getId();
                     vallogize(path, id, [path.node.left.relId, path.node.right.relId]);
                     path.node.relId = id;
-                    debugLog(`binexp exit(${path.node.operator})`);
+                    debugLog(`binexp(logexp) exit(${path.node.operator})`);
                     return;
                 }
                 case 'NullLiteral':
@@ -230,12 +262,14 @@ function vallogize(path, selfId, relIds) {
     var char2 = path.node.loc.end.column;
     var relIds = (relIds ?? []).filter(k => k != undefined).map(k => types.identifier(`__refs['${k}']`));
 
-    var idNames = [];
+
+    // ここの優先順位の理由は何？
+    var idName = '';
     if (path.node.type == 'Identifier') {
-        idNames.push(types.stringLiteral(path.node.name));
+        idName = path.node.name;
     }
     if (path.node.varName != undefined) {
-        idNames.push(types.stringLiteral(path.node.varName));
+        idName = path.node.varName;
     }
 
     path.replaceWith(
@@ -249,13 +283,18 @@ function vallogize(path, selfId, relIds) {
                 types.numericLiteral(char2),
                 types.arrayExpression(relIds),
                 types.stringLiteral(selfId),
-                types.arrayExpression(idNames)
+                types.identifier(idName)
             ]));
     path.mySkip = true;
 }
 
-function PassExpAst(val, line, rel) {
-    return template.expression.ast(`__pass(${val}, ${line}, ${rel})`);
+// TODO: vallogize関数の変更を受けず独立しているため良くない。なんとかする
+function PassExpAst(val, loc, rel) {
+    let line1 = loc.start.line;
+    let char1 = loc.start.column;
+    let line2 = loc.end.line;
+    let char2 = loc.end.column;
+    return template.expression.ast(`__pass(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_', '${val}')`);
 }
 
 // 仮引数の行を通過したことを記録するための補助関数
@@ -265,5 +304,5 @@ function PassStatAst(val, loc, rel) {
     let char1 = loc.start.column;
     let line2 = loc.end.line;
     let char2 = loc.end.column;
-    return template.statement.ast(`__pass(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_', ['${val}']);`);
+    return template.statement.ast(`__pass(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_', '${val}');`);
 }
