@@ -328,6 +328,7 @@ btnStartDebug.onclick = () => {
         vals: vals,
         showTrace: showTrace,
         showTraces: showTraces,
+        query: QUERY,
         clear: () => { VALLOG.data.watchList = []; draw(); return 'OK'; }
     };
     myCodeMirror.setOption('readOnly', true);
