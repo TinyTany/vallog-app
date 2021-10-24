@@ -43,10 +43,16 @@ QUERY.findValue = () => {
     return found;
 };
 
+// 値の「生成」に関与した値を検索
 QUERY.findGen = (id) => {
-
+    let vllg = VALLOG.data.vals[id];
+    if (!vllg) {
+        throw `Invalid id ${id}`;
+    }
+    return vllg.traces[0].relate.map(r => ({id: r.id.id, value: VALLOG.data.vals[r.id.id].value}));
 }
 
+// 値に関与した値を検索
 QUERY.findRelate = (id) => {
-
+    
 };
