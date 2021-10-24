@@ -8,11 +8,14 @@ const cls = VALLOG.class;
 const fun = VALLOG.function;
 
 // 追跡値情報保持用（DB）
-VALLOG.data.vals = []; // [Vallog]
+/** @type {Vallog[]} */
+VALLOG.data.vals = [];
 // 値追跡処理時に使用（一時的に追跡値に名前を付けて保持）
-VALLOG.data.refs = []; // [Vallog]
+/** @type {Vallog[]} */
+VALLOG.data.refs = [];
 // 観察対象の経路
-VALLOG.data.watchList = []; // [{loc: [LocationPair], color: string}]
+/** @type {{loc: LocationPair[], color: String}[]} */
+VALLOG.data.watchList = [];
 
 VALLOG.init = () => {
     data.vals = [];
@@ -21,24 +24,40 @@ VALLOG.init = () => {
     cls.VallogId.init();
 };
 
+// Location型はすでにあり、@typedefでは上書きされない...
+/**
+ * @typedef MyLocation
+ * @property {Number} line
+ * @property {Number} ch */
 VALLOG.class.Location = class {
-    #line = 0; // Number(1-indexed)
-    #char = 0; // Number(0-indexed)
+    /** @type {Number} */
+    #line = 0; // 1-indexed
+    /** @type {Number} */
+    #char = 0; // 0-indexed
     constructor(line, char) {
         this.#line = line;
         this.#char = char;
     }
+    /** 1-indexed */
     get line() {
         return this.#line;
     }
+    /** 0-indexed */
     get char() {
         return this.#char;
     }
 };
 
+/**
+ * @typedef LocationPair
+ * @property {MyLocation} start
+ * @property {MyLocation} end
+ */
 VALLOG.class.LocationPair = class {
-    #start; // Location
-    #end; // Location
+    /** @type {MyLocation} */
+    #start;
+    /** @type {MyLocation} */
+    #end;
     constructor(start, end) {
         this.#start = start;
         this.#end = end;
@@ -51,9 +70,16 @@ VALLOG.class.LocationPair = class {
     }
 };
 
+/**
+ * @typedef VisitPosition
+ * @property {LocationPair} locationPair
+ * @property {String} name
+ */
 VALLOG.class.VisitPosition = class {
-    #locationPair; // LocationPair
-    #name; // string
+    /** @type {LocationPair} */
+    #locationPair;
+    /** @type {String} */
+    #name;
     constructor(locationPair, name) {
         this.#locationPair = locationPair;
         this.#name = name;
@@ -66,8 +92,13 @@ VALLOG.class.VisitPosition = class {
     }
 };
 
+/**
+ * @typedef VallogId
+ * @property {Number} id
+ */
 VALLOG.class.VallogId = class {
     static #__id = 0;
+    /** @type {Number} */
     #id;
     constructor() {
         this.#id = cls.VallogId.#__id++;
@@ -80,9 +111,16 @@ VALLOG.class.VallogId = class {
     }
 };
 
+/**
+ * @typedef RelateInfo
+ * @property {VallogId} id
+ * @property {Number} time
+ */
 VALLOG.class.RelateInfo = class {
-    #relateValId; // VallogId
-    #relateTime; // Number (0-indexed)
+    /** @type {VallogId} */
+    #relateValId;
+    /** @type {Number} */
+    #relateTime;
     constructor(id, time) {
         this.#relateValId = id;
         this.#relateTime = time;
@@ -95,9 +133,16 @@ VALLOG.class.RelateInfo = class {
     }
 };
 
+/**
+ * @typedef Trace
+ * @property {VisitPosition} position
+ * @property {RelateInfo[]} relate
+ */
 VALLOG.class.Trace = class {
-    #visitPosition; // VisitPosition
-    #relateInfo; // [RelateInfo]
+    /** @type {VisitPosition} */
+    #visitPosition;
+    /** @type {RelateInfo[]} */
+    #relateInfo;
     constructor(position, info) {
         this.#visitPosition = position;
         this.#relateInfo = info;
@@ -110,13 +155,22 @@ VALLOG.class.Trace = class {
     }
 };
 
+/**
+ * @typedef Vallog
+ * @property {VallogId} id
+ * @property {any} value
+ * @property {Trace[]} traces
+ */
 VALLOG.class.Vallog = class {
-    #id = new cls.VallogId(); // VallogId
-    #value; // any
-    #traceInfo = []; // [Trace]
+    /** @type {VallogId} */
+    #id = new cls.VallogId();
+    /** @type {any} */
+    #value;
+    /** @type {Trace[]} */
+    #traceInfo = [];
     // value: any
     // line1, char1, line2, char2: number
-    // rels: [Vallog]
+    // rels: Vallog[]
     // name: string
     constructor(value, line1, char1, line2, char2, rels, name) {
         this.#value = value;
@@ -145,7 +199,7 @@ VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name) => {
 
 // obj: any
 // line1, char1, line2, char2: number
-// rels: [Vallog]
+// rels: Vallog[]
 // key, name: string
 VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name) => {
     if (!(obj instanceof cls.Vallog)) {
