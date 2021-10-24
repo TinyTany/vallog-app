@@ -10,10 +10,14 @@ const types = window.modules.babel_types;
 // const template = require('@babel/template');
 // const types = require('@babel/types');
 
-var my_id = 0;
-function getId() {
-    return `t${my_id++}`;
-}
+const getId = (() => {
+    let id = 0;
+    return () => {
+        return `id${id++}`;
+    };
+})();
+
+let testExpIdStack = [];
 
 const debugMode = false;
 function debugLog(str) {
@@ -91,6 +95,9 @@ function transform(program) {
                 case 'DoWhileStatement':
                 case 'ForStatement': {
                     path.node.test.getValMode = true;
+                    // test式のidをスタックにpushするリクエスト
+                    // このリクエストはVallogize関数内で処理
+                    path.node.test.pushIdRequest = true;
                     return;
                 }
                 case 'AssignmentExpression': {
@@ -227,6 +234,13 @@ function transform(program) {
                     path.node.relId = id;
                     return;
                 }
+                case 'IfStatement':
+                case 'WhileStatement':
+                case 'DoWhileStatement':
+                case 'ForStatement': {
+                    testExpIdStack.pop();
+                    return;
+                }
                 default:
                     return;
             };
@@ -260,8 +274,27 @@ function vallogize(path, selfId, relIds) {
     var char1 = path.node.loc.start.column;
     var line2 = path.node.loc.end.line;
     var char2 = path.node.loc.end.column;
-    var relIds = (relIds ?? []).filter(k => k != undefined).map(k => types.identifier(`__refs['${k}']`));
+    var relIds = (relIds ?? []);
+    // ここの挙動にはバリエーションがありそう
+    // 全ての外側のスコープの条件式をrelIdsに含める
+    // testExpIdStack.forEach(id => {
+    //     relIds.push(id);
+    // });
+    // または、
+    // 外側の一番内側のスコープの条件式のみをrelIdsに含める
+    if (testExpIdStack.length != 0) {
+        let lst = testExpIdStack.length - 1;
+        relIds.push(testExpIdStack[lst]);
+    }
+    
+    relIds = relIds.filter(k => k != undefined).map(k => types.identifier(`__refs['${k}']`));
 
+    // HACK: 順番が大事
+    // このコードをrelIdsの作成完了前に持ってくると、「「自身の値」に関与する値」に「自身の値」が含まれてしまう
+    if (path.node.pushIdRequest) {
+        path.node.pushIdRequest = false;
+        testExpIdStack.push(selfId);   
+    }
 
     // ここの優先順位の理由は何？
     var idName = '';
