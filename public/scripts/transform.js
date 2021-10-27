@@ -316,7 +316,7 @@ function vallogize(path, selfId, relIds) {
                 types.numericLiteral(char2),
                 types.arrayExpression(relIds),
                 types.stringLiteral(selfId),
-                types.identifier(idName)
+                types.stringLiteral(idName)
             ]));
     path.mySkip = true;
 }

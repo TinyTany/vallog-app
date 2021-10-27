@@ -8,12 +8,15 @@ const divTerminal = document.getElementById('terminal');
 const btnStartDebug = document.getElementById('btnStartDebug');
 const btnEndDebug = document.getElementById('btnEndDebug');
 const canvas = document.getElementById('canvas');
+const text1 = document.getElementById('text1');
 
 // CodeMirrorの設定
 let myCodeMirror = CodeMirror.fromTextArea(taCode, {
     mode: 'javascript',
     lineNumbers: true
 });
+// CodeMirrorエディタのフォントサイズ変更
+// 経路描画も更新される
 function changeFontSize(px) {
     if (px <= 0) {
         return;
@@ -363,6 +366,7 @@ btnStartDebug.onclick = () => {
     myCodeMirror.setOption('readOnly', true);
     btnEndDebug.removeAttribute('disabled');
     btnStartDebug.setAttribute('disabled', true);
+    text1.innerText = 'Program (Read only)';
 };
 
 btnEndDebug.onclick = () => {
@@ -376,6 +380,7 @@ btnEndDebug.onclick = () => {
     myCodeMirror.setOption('readOnly', false);
     btnEndDebug.setAttribute('disabled', true);
     btnStartDebug.removeAttribute('disabled');
+    text1.innerText = 'Program';
 };
 
 myCodeMirror.on('scroll', (cm) => {
@@ -388,6 +393,7 @@ let draw = () => {
         // canvas-unsupported code here
         return;
     }
+
     let ctx = canvas.getContext('2d');
     let cm = myCodeMirror;
     let si = cm.getScrollInfo();
@@ -410,9 +416,11 @@ let draw = () => {
             ctx.clip();
         };
     }
+
     // エディタのクライアントサイズ（見えている部分のサイズ）をcanvasに設定
     canvas.width = si.clientWidth;
     canvas.height = si.clientHeight
+
     // エディタの仮想サイズ確認用コード
     {
         const debug = false;
@@ -430,7 +438,8 @@ let draw = () => {
             ctx.restore();
         }
     }
-    // 追跡値の経路描画
+
+    // 追跡値の経路描画（メインの処理）
     {
         VALLOG.data.watchList.forEach(x => {
             ctx.strokeStyle = ctx.fillStyle = x.color;
