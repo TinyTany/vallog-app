@@ -28,6 +28,32 @@ function changeFontSize(px) {
     return 'OK';
 }
 
+// 標準出力先の操作など
+{
+    const log = console.log;
+    const error = console.error;
+
+    // 標準出力先をすり替え
+    console.setOutput = (xterm) => {
+        console.log = (...args) => {
+            log(...args);
+            let out = window.modules.util.inspect(args[0], { colors: true, depth: null });
+            xterm.writeln(out);
+        }
+        console.error = (...args) => {
+            error(...args);
+            let out = window.modules.util.inspect(args[0], { colors: true, depth: null });
+            xterm.writeln(out);
+        }
+    };
+
+    // すり替えた標準出力を元に戻す
+    console.resetOutput = () => {
+        console.log = log;
+        console.error = error;
+    };
+}
+
 // xtermのテーマ
 const xtermTheme = {
     background: '#1e1e1e',
@@ -270,18 +296,7 @@ btnRun.onclick = () => {
     termOut.clear();
     const code = myCodeMirror.getValue();
     // 標準出力先をすり替え
-    let log = console.log;
-    let error = console.error;
-    console.log = (...args) => {
-        log(...args);
-        let out = window.modules.util.inspect(args[0], { colors: true, depth: null });
-        termOut.writeln(out);
-    }
-    console.error = (...args) => {
-        error(...args);
-        let out = window.modules.util.inspect(args[0], { colors: true, depth: null });
-        termOut.writeln(out);
-    }
+    console.setOutput(termOut);
     // プログラム実行
     try {
         window.modules.vm.runInNewContext(code, {console: console});
@@ -289,9 +304,10 @@ btnRun.onclick = () => {
     catch (e) {
         termOut.writeln(e.toString());
     }
-    // すり替えた標準出力を元に戻す
-    console.log = log;
-    console.error = error;
+    finally {
+        // すり替えた標準出力を元に戻す
+        console.resetOutput();
+    }
 };
 
 btnClear.onclick = () => {
@@ -317,7 +333,20 @@ btnStartDebug.onclick = () => {
     term.writeln('[info] Transpile success');
     term.writeln('[info] Running transpiled program');
     VALLOG.init();
-    let vals = window.modules.vm.runInNewContext(program, {VALLOG: VALLOG, console: console});
+    try {
+        console.setOutput(term);
+        var vals = window.modules.vm.runInNewContext(program, {VALLOG: VALLOG, console: console});
+    }
+    catch (e) {
+        // 変換後のプログラムで例外キャッチを行っているので，ここまで例外が流れてくることはありえなさそう
+        term.writeln(e.toString());
+        term.writeln('[error] Run failed')
+        console.log(e); // debug
+        return;
+    }
+    finally {
+        console.resetOutput();
+    }
     term.writeln('[info] Success');
     term.writeln('[info] Ready');
     term.write('\r\n\x1b[s');
