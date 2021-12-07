@@ -23,13 +23,20 @@ const getId = (() => {
     };
 })();
 
-let testExpIdStack = [];
+/** @type {string[]} */
+let testExpIdStack;
+/** @type {string[][]} */
+let staticBlockCpStack;
 
 const debugMode = false;
 function debugLog(str) {
     if (debugMode) {
         console.log(str);
     }
+}
+
+function codePositionStr(node) {
+    return `(${node.loc.start.line}:${node.loc.start.column})`;
 }
 
 /** 
@@ -46,7 +53,15 @@ function debugLog(str) {
  * cpNames: そのnode（式）に設置すべきcheckpoint
  */
 
-function transform(program) {
+function transform(program, option) {
+    // 初期化
+    testExpIdStack = [];
+    staticBlockCpStack = [];
+
+    // オプション設定
+    const implcpArrayRef = option?.implcp?.arrayRef ?? false;
+    const implcpIfTest = option?.implcp?.ifTest ?? false;
+
     let ast = parser.parse(program);
 
     traverse.default(ast, {
@@ -86,7 +101,13 @@ function transform(program) {
                     if (callee.type == 'Identifier') {
                         switch (callee.name) {
                             case spf_cp_exp: {
-                                // 存在&型チェックすべき？
+                                // 存在&型チェック
+                                if (path.node.arguments.length < 2) {
+                                    throw `SyntaxError: Missing arguments of ${spf_cp_exp} ${codePositionStr(path.node)}`;
+                                }
+                                if (path.node.arguments[1].type != 'StringLiteral') {
+                                    throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
+                                }
                                 const exp = path.node.arguments[0];
                                 const cpName = path.node.arguments[1].value;
                                 // メタ情報の引継ぎ
@@ -102,17 +123,53 @@ function transform(program) {
                                 return;
                             }
                             case spf_cp_block_static: {
-                                // TODO: Not implemented yet
+                                // 存在&型チェック
+                                if (path.node.arguments.length < 1) {
+                                    throw `SyntaxError: Missing arguments of ${spf_cp_block_static} ${codePositionStr(path.node)}`;
+                                }
+                                if (path.node.arguments[0].type != 'StringLiteral') {
+                                    throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
+                                }
+                                // メインの仕事
+                                const cpName = path.node.arguments[0].value;
+                                if (staticBlockCpStack.length != 0) {
+                                    const lst = staticBlockCpStack.length - 1;
+                                    staticBlockCpStack[lst].push(cpName);
+                                }
+                                // BlockStatement内のExpressionStatementとなっているかチェック
+                                if (path.parentPath.node.type != 'ExpressionStatement' ||
+                                path.parentPath.parentPath.node.type != 'BlockStatement') {
+                                    throw `SyntaxError: ${spf_cp_block_static} must be statement in block ${codePositionStr(path.node)}`;
+                                }
+                                path.remove();
                                 return;
                             }
                             case spf_cp_block_dynamic: {
+                                // 存在&型チェック
+                                if (path.node.arguments.length < 1) {
+                                    throw `SyntaxError: Missing arguments of ${spf_cp_block_dynamic} ${codePositionStr(path.node)}`;
+                                }
+                                if (path.node.arguments[0].type != 'StringLiteral') {
+                                    throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
+                                }
+                                // メインの仕事
                                 // TODO: Not implemented yet
+                                // BlockStatement内のExpressionStatementとなっているかチェック
+                                if (path.parentPath.node.type != 'ExpressionStatement' ||
+                                path.parentPath.parentPath.node.type != 'BlockStatement') {
+                                    throw `SyntaxError: ${spf_cp_block_dynamic} must be statement ${codePositionStr(path.node)}`;
+                                }
+                                path.remove();
                                 return;
                             }
                             default: break;
                         }
                     }
                     callee.getValMode = true;
+                    return;
+                }
+                case 'BlockStatement': {
+                    staticBlockCpStack.push([]);
                     return;
                 }
                 case 'ReturnStatement': {
@@ -272,6 +329,10 @@ function transform(program) {
                     debugLog('callexp exit');
                     return;
                 }
+                case 'BlockStatement': {
+                    staticBlockCpStack.pop();
+                    return;
+                }
                 case 'ReturnStatement': {
                     debugLog('return exit');
                     return;
@@ -345,6 +406,9 @@ function vallogize(path, selfId, relIds) {
     if (path.node.cpNames) {
         cpNames = path.node.cpNames.map(cp => types.stringLiteral(cp));
     }
+    staticBlockCpStack.flat().forEach(cp => {
+        cpNames.push(types.stringLiteral(cp));
+    });
 
     // HACK: 順番が大事
     // このコードをrelIdsの作成完了前に持ってくると、「「自身の値」に関与する値」に「自身の値」が含まれてしまう
