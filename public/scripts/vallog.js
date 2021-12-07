@@ -189,6 +189,9 @@ VALLOG.class.Vallog = class {
     get traces() {
         return this.#traceInfo;
     }
+    inspect(depth, opts) {
+        return {id: this.id.id, value: this.value};
+    }
 };
 
 VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps) => {
