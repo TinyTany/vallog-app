@@ -149,7 +149,7 @@ function transform(program) {
                 case 'VariableDeclarator': {
                     var lhs = path.node.id;
                     var ast = PassExpAst(lhs.name, lhs.loc, '[]');
-                    var node = types.variableDeclarator(types.identifier('__dummy'), ast);
+                    var node = types.variableDeclarator(types.identifier(`__dummy${getId()}`), ast);
                     path.insertAfter(node);
                     path.getSibling(path.key + 1).mySkip = true;
                     return;
