@@ -143,15 +143,21 @@ VALLOG.class.Trace = class {
     #visitPosition;
     /** @type {RelateInfo[]} */
     #relateInfo;
-    constructor(position, info) {
+    /** @type {string[]} */
+    #checkPoint;
+    constructor(position, info, cp) {
         this.#visitPosition = position;
         this.#relateInfo = info;
+        this.#checkPoint = cp;
     }
     get position() {
         return this.#visitPosition;
     }
     get relate() {
         return this.#relateInfo;
+    }
+    get checkPoint() {
+        return this.#checkPoint;
     }
 };
 
@@ -167,14 +173,11 @@ VALLOG.class.Vallog = class {
     /** @type {any} */
     #value;
     /** @type {Trace[]} */
-    #traceInfo = [];
+    #traceInfo;
     // value: any
-    // line1, char1, line2, char2: number
-    // rels: Vallog[]
-    // name: string
-    constructor(value, line1, char1, line2, char2, rels, name) {
+    constructor(value) {
         this.#value = value;
-        this.#traceInfo.push(fun.makeTrace(line1, char1, line2, char2, rels, name));
+        this.#traceInfo = [];
     }
     get id() {
         return this.#id;
@@ -187,34 +190,34 @@ VALLOG.class.Vallog = class {
     }
 };
 
-VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name) => {
+VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps) => {
     let locPair = new cls.LocationPair(
         new cls.Location(line1, char1),
         new cls.Location(line2, char2)
     );
     let relInfos = rels.map(vllg => new cls.RelateInfo(vllg.id, vllg.traces.length - 1));
     let visitPos = new cls.VisitPosition(locPair, name);
-    return new cls.Trace(visitPos, relInfos);
+    return new cls.Trace(visitPos, relInfos, cps ?? []);
 };
 
 // obj: any
 // line1, char1, line2, char2: number
 // rels: Vallog[]
 // key, name: string
-VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name) => {
-    if (!(obj instanceof cls.Vallog)) {
-        let vllg = new cls.Vallog(obj, line1, char1, line2, char2, rels, name);
-        data.vals.push(vllg);
-        data.refs[key] = vllg;
-        return vllg;
+// cps: string[]
+VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name, cps) => {
+    let tmp = obj;
+    if (!(tmp instanceof cls.Vallog)) {
+        tmp = new cls.Vallog(obj);
+        data.vals.push(tmp);
     }
-    data.refs[key] = obj;
+    data.refs[key] = tmp;
     // 前回と同じ場所、同じ関連する値、同じ変数名だった場合に追跡子情報を付与するorしない？
-    obj.traces.push(fun.makeTrace(line1, char1, line2, char2, rels, name));
-    return obj;
+    tmp.traces.push(fun.makeTrace(line1, char1, line2, char2, rels, name, cps));
+    return tmp;
 };
 
-VALLOG.function.getVal = (obj, line1, char1, line2, char2, rels, key, name) => {
-    let vllg = fun.pass(obj, line1, char1, line2, char2, rels, key, name);
+VALLOG.function.getVal = (obj, line1, char1, line2, char2, rels, key, name, cps) => {
+    let vllg = fun.pass(obj, line1, char1, line2, char2, rels, key, name, cps);
     return vllg.value;
 };
