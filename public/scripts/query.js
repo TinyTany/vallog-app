@@ -1,4 +1,6 @@
 var QUERY = QUERY || {};
+QUERY.data = QUERY.data || {};
+QUERY.class = QUERY.class || {};
 
 // 取得した値情報をすべて表示する（idと値の表記）
 QUERY.valueList = () => {
@@ -55,4 +57,37 @@ QUERY.findGen = (id) => {
 // 値に関与した値を検索
 QUERY.findRelate = (id) => {
     
+};
+
+/** @type {Log} */
+QUERY.class.Log = class {
+    /** @type {Vallog[]} */
+    #log;
+    constructor(log) {
+        this.#log = log;
+    }
+    passCp(cp) {
+        let ans = [];
+        this.#log.forEach(v => {
+            if (v.traces.some(t => t.checkPoint.includes(cp))) {
+                ans.push(v);
+            }
+        });
+        return new QUERY.class.Log(ans);
+    }
+    npassCp(cp) {
+        let ans = [];
+        this.#log.forEach(v => {
+            if (v.traces.every(t => !t.checkPoint.includes(cp))) {
+                ans.push(v);
+            }
+        });
+        return new QUERY.class.Log(ans);
+    }
+    inspect(depth, ops) {
+        return this.#log;
+    }
+    get length() {
+        return this.#log.length;
+    }
 };
