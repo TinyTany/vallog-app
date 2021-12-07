@@ -10,6 +10,12 @@ const types = window.modules.babel_types;
 // const template = require('@babel/template');
 // const types = require('@babel/types');
 
+// special form name
+const spf_cp_exp = 'cp_exp';
+const spf_cp_block_static = 'cp_block_static';
+const spf_cp_block_dynamic = 'cp_block_dynamic';
+const spf_cp_assert = 'cp_assert';
+
 const getId = (() => {
     let id = 0;
     return () => {
@@ -25,6 +31,20 @@ function debugLog(str) {
         console.log(str);
     }
 }
+
+/** 
+ * pathに追加で付与するプロパティについて
+ * mySkip: これがtrueの場合，それ以下のpathに対してプログラム変換をしないようにする
+ * API側で用意されているshouldSkipを使うと何かうまくいかないことがあった（忘れた）ので，代わりにこれを使用
+ * 
+ * nodeに追加で付与するプロパティについて
+ * getValMode: trueの場合，そのnodeを包む追跡子情報取得関数にpassではなくgetValを使う
+ * noVallogize: trueの場合，そのnodeは追跡子情報取得関数で包まない
+ * pushIdRequest: そのnodeがtest式のとき，そのidをスタックにpushするリクエスト
+ * relId: そのnode（式）を識別するための数値id
+ * name: そのnode（式）が変数の場合にその名前を文字列で保持しておく
+ * cpNames: そのnode（式）に設置すべきcheckpoint
+ */
 
 function transform(program) {
     let ast = parser.parse(program);
@@ -62,7 +82,37 @@ function transform(program) {
                 }
                 case 'CallExpression': {
                     debugLog('callexp enter');
-                    path.node.callee.getValMode = true;
+                    const callee = path.node.callee;
+                    if (callee.type == 'Identifier') {
+                        switch (callee.name) {
+                            case spf_cp_exp: {
+                                // 存在&型チェックすべき？
+                                const exp = path.node.arguments[0];
+                                const cpName = path.node.arguments[1].value;
+                                // メタ情報の引継ぎ
+                                exp.getValMode = path.node.getValMode;
+                                exp.noVallogize = path.node.noVallogize;
+                                exp.pushIdRequest = path.node.pushIdRequest;
+                                // pathの繋ぎ変え
+                                path.replaceWith(exp);
+                                if (!path.node.cpNames) {
+                                    path.node.cpNames = [];
+                                }
+                                path.node.cpNames.push(cpName);
+                                return;
+                            }
+                            case spf_cp_block_static: {
+                                // TODO: Not implemented yet
+                                return;
+                            }
+                            case spf_cp_block_dynamic: {
+                                // TODO: Not implemented yet
+                                return;
+                            }
+                            default: break;
+                        }
+                    }
+                    callee.getValMode = true;
                     return;
                 }
                 case 'ReturnStatement': {
@@ -71,9 +121,6 @@ function transform(program) {
                 }
                 case 'VariableDeclarator': {
                     path.node.id.noVallogize = true;
-                    if (!path.node.init) {
-                        return;
-                    }
                     return;
                 }
                 case 'MemberExpression': {
@@ -106,6 +153,7 @@ function transform(program) {
                 }
                 case 'ExpressionStatement': {
                     // void関数呼出の返値undefinedなどの不要な追跡値を防止
+                    // HACK: ExpressionStatementになるのは関数呼び出しだけではないので，この対処は不適切かも
                     path.node.expression.noVallogize = true;
                     return;
                 }
@@ -147,6 +195,10 @@ function transform(program) {
                     return;
                 }
                 case 'VariableDeclarator': {
+                    // 宣言のみの場合
+                    if (!path.node.init) {
+                        return;
+                    }
                     var lhs = path.node.id;
                     var ast = PassExpAst(lhs.name, lhs.loc, '[]');
                     var node = types.variableDeclarator(types.identifier(`__dummy${getId()}`), ast);
@@ -288,6 +340,11 @@ function vallogize(path, selfId, relIds) {
     }
     
     relIds = relIds.filter(k => k != undefined).map(k => types.identifier(`__refs['${k}']`));
+    
+    let cpNames = [];
+    if (path.node.cpNames) {
+        cpNames = path.node.cpNames.map(cp => types.stringLiteral(cp));
+    }
 
     // HACK: 順番が大事
     // このコードをrelIdsの作成完了前に持ってくると、「「自身の値」に関与する値」に「自身の値」が含まれてしまう
@@ -316,7 +373,8 @@ function vallogize(path, selfId, relIds) {
                 types.numericLiteral(char2),
                 types.arrayExpression(relIds),
                 types.stringLiteral(selfId),
-                types.stringLiteral(idName)
+                types.stringLiteral(idName),
+                types.arrayExpression(cpNames)
             ]));
     path.mySkip = true;
 }

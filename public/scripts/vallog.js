@@ -137,6 +137,7 @@ VALLOG.class.RelateInfo = class {
  * @typedef Trace
  * @property {VisitPosition} position
  * @property {RelateInfo[]} relate
+ * @property {string[]} checkPoint
  */
 VALLOG.class.Trace = class {
     /** @type {VisitPosition} */

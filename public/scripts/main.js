@@ -297,7 +297,14 @@ term.onKey(e => {
 
 btnRun.onclick = () => {
     termOut.clear();
-    const code = myCodeMirror.getValue();
+    // special formのダミー関数を挿入
+    // special formの名前は変換器側と合わせている
+    const code = `
+        const ${spf_cp_block_static} = (cp) => undefined;
+        const ${spf_cp_block_dynamic} = (cp) => undefined;
+        const ${spf_cp_exp} = (exp, cp) => exp;
+        const ${spf_cp_assert}= (pred) => undefined;`
+        + myCodeMirror.getValue();
     // 標準出力先をすり替え
     console.setOutput(termOut);
     // プログラム実行
