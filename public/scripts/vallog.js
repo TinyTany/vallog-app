@@ -15,6 +15,8 @@ VALLOG.data.vals = [];
 VALLOG.data.refs = [];
 /** @type {string[]} */
 VALLOG.data.dynamicCpExpStack = [];
+/** @type {string[][]} */
+VALLOG.data.dynamicCpBlockStack = [];
 // 観察対象の経路
 /** @type {{loc: LocationPair[], color: String}[]} */
 VALLOG.data.watchList = [];
@@ -23,6 +25,7 @@ VALLOG.init = () => {
     data.vals = [];
     data.refs = [];
     data.dynamicCpExpStack = [];
+    data.dynamicCpBlockStack = [];
     data.watchList = [];
     cls.VallogId.init();
 };
@@ -197,7 +200,7 @@ VALLOG.class.Vallog = class {
     }
 };
 
-VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps) => {
+VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps, scpd) => {
     let locPair = new cls.LocationPair(
         new cls.Location(line1, char1),
         new cls.Location(line2, char2)
@@ -206,6 +209,17 @@ VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps) => {
     let visitPos = new cls.VisitPosition(locPair, name);
     let checkpoints = cps ?? [];
     checkpoints = [...checkpoints, ...data.dynamicCpExpStack];
+    // cp_block_dynamic関連
+    if (scpd) {
+        if (data.dynamicCpBlockStack.length != scpd) {
+            // この場合，dynamicCpBlockStack.length > scpdとなっているはず...
+            const popTimes = data.dynamicCpBlockStack.length - scpd;
+            for (let i = 0; i < popTimes; ++i) {
+                data.dynamicCpBlockStack.pop();
+            }
+        }
+        checkpoints = [...checkpoints, ...data.dynamicCpBlockStack.flat()];
+    }
     return new cls.Trace(visitPos, relInfos, checkpoints);
 };
 
@@ -214,7 +228,7 @@ VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps) => {
 // rels: Vallog[]
 // key, name: string
 // cps: string[]
-VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name, cps) => {
+VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name, cps, scpd) => {
     let tmp = obj;
     if (!(tmp instanceof cls.Vallog)) {
         tmp = new cls.Vallog(obj);
@@ -222,14 +236,16 @@ VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name, cps) =
     }
     data.refs[key] = tmp;
     // 前回と同じ場所、同じ関連する値、同じ変数名だった場合に追跡子情報を付与するorしない？
-    tmp.traces.push(fun.makeTrace(line1, char1, line2, char2, rels, name, cps));
+    tmp.traces.push(fun.makeTrace(line1, char1, line2, char2, rels, name, cps, scpd));
     return tmp;
 };
 
-VALLOG.function.getVal = (obj, line1, char1, line2, char2, rels, key, name, cps) => {
-    let vllg = fun.pass(obj, line1, char1, line2, char2, rels, key, name, cps);
+VALLOG.function.getVal = (obj, line1, char1, line2, char2, rels, key, name, cps, scpd) => {
+    let vllg = fun.pass(obj, line1, char1, line2, char2, rels, key, name, cps, scpd);
     return vllg.value;
 };
+
+// cp_exp_dynamic関連
 
 VALLOG.function.dynamicCpExpPush = (cp) => {
     data.dynamicCpExpStack.push(cp);
@@ -238,3 +254,18 @@ VALLOG.function.dynamicCpExpPush = (cp) => {
 VALLOG.function.dynamicCpExpPop = () => {
     data.dynamicCpExpStack.pop();
 };
+
+// cp_block_dynamic関連
+
+VALLOG.function.dynamicCpBlockStackLen = () => {
+    return data.dynamicCpBlockStack.length;
+}
+
+VALLOG.function.dynamicCpBlockStackPush = (cp) => {
+    const lst = data.dynamicCpBlockStack.length - 1;
+    data.dynamicCpBlockStack[lst].push(cp);
+}
+
+VALLOG.function.dynamicCpBlockNewFrame = () => {
+    data.dynamicCpBlockStack.push([]);
+}

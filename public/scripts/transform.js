@@ -31,6 +31,8 @@ let testExpIdStack;
 let staticExpCpStack;
 /** @type {string[][]} */
 let staticBlockCpStack;
+/** @type {string[]} */
+let dynamicBlockScopeVarStack;
 
 const debugMode = false;
 function debugLog(str) {
@@ -48,7 +50,7 @@ function codePositionStr(node) {
 function validateCpExpPath(path) {
     // 存在&型チェック
     if (path.node.arguments.length < 2) {
-        throw `SyntaxError: Missing arguments of ${spf_cp_exp_normal} ${codePositionStr(path.node)}`;
+        throw `SyntaxError: Missing arguments ${codePositionStr(path.node)}`;
     }
     if (path.node.arguments[1].type != 'StringLiteral') {
         throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
@@ -58,7 +60,7 @@ function validateCpExpPath(path) {
 function validateCpBlockPath(path) {
     // 存在&型チェック
     if (path.node.arguments.length < 1) {
-        throw `SyntaxError: Missing arguments of ${spf_cp_block_static} ${codePositionStr(path.node)}`;
+        throw `SyntaxError: Missing arguments ${codePositionStr(path.node)}`;
     }
     if (path.node.arguments[0].type != 'StringLiteral') {
         throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
@@ -66,7 +68,7 @@ function validateCpBlockPath(path) {
     // BlockStatement内のExpressionStatementとなっているかチェック
     if (path.parentPath.node.type != 'ExpressionStatement' ||
     path.parentPath.parentPath.node.type != 'BlockStatement') {
-        throw `SyntaxError: ${spf_cp_block_static} must be statement in block ${codePositionStr(path.node)}`;
+        throw `SyntaxError: cp_block must be statement in block ${codePositionStr(path.node)}`;
     }
 }
 
@@ -89,6 +91,7 @@ function transform(program, option) {
     testExpIdStack = [];
     staticExpCpStack = [];
     staticBlockCpStack = [];
+    dynamicBlockScopeVarStack = [];
 
     // オプション設定
     const implcpArrayRef = option?.implcp?.arrayRef ?? false;
@@ -99,7 +102,6 @@ function transform(program, option) {
     traverse.default(ast, {
         enter(path) {
             if (path.mySkip) {
-                path.mySkip = false;
                 debugLog('enter: skipped');
                 path.shouldSkip = true;
                 return;
@@ -203,8 +205,9 @@ function transform(program, option) {
                                 // validation
                                 validateCpBlockPath(path);
                                 // メインの仕事
-                                // TODO: Not implemented yet
-                                path.remove();
+                                callee.name = '__dynamicCpBlockStackPush';
+                                path.get('callee').mySkip = true;
+                                path.get('arguments').forEach(p => p.mySkip = true);
                                 return;
                             }
                             default: break;
@@ -215,7 +218,20 @@ function transform(program, option) {
                     return;
                 }
                 case 'BlockStatement': {
+                    // spf_cp_block_static
                     staticBlockCpStack.push([]);
+                    // spf_cp_block_dynamic
+                    const scopeVarName = `__scope_depth_${getId()}`;
+                    dynamicBlockScopeVarStack.push(scopeVarName)
+                    const newNode1 = template.statement.ast(
+                        `__dynamicCpBlockNewFrame();`);
+                    const newNode2 = template.statement.ast(
+                        `let ${scopeVarName} = __dynamicCpBlockStackLen();`
+                    );
+                    path.unshiftContainer('body', newNode2);
+                    path.unshiftContainer('body', newNode1);
+                    path.get('body.0').mySkip = true;
+                    path.get('body.1').mySkip = true;
                     return;
                 }
                 case 'ReturnStatement': {
@@ -266,7 +282,6 @@ function transform(program, option) {
         },
         exit(path) {
             if (path.mySkip) { 
-                path.mySkip = false;
                 debugLog('exit: skipped');
                 path.shouldSkip = true;
                 return; 
@@ -413,7 +428,10 @@ function transform(program, option) {
                     return;
                 }
                 case 'BlockStatement': {
+                    // spf_cp_block_static
                     staticBlockCpStack.pop();
+                    // spf_cp_block_dynamic
+                    dynamicBlockScopeVarStack.pop();
                     return;
                 }
                 case 'ReturnStatement': {
@@ -449,6 +467,9 @@ function transform(program, option) {
         const __refs = VALLOG.data.refs;
         const __dynamic_cp_exp_push = VALLOG.function.dynamicCpExpPush;
         const __dynamic_cp_exp_pop = VALLOG.function.dynamicCpExpPop;
+        const __dynamicCpBlockStackLen = VALLOG.function.dynamicCpBlockStackLen;
+        const __dynamicCpBlockStackPush = VALLOG.function.dynamicCpBlockStackPush;
+        const __dynamicCpBlockNewFrame = VALLOG.function.dynamicCpBlockNewFrame;
         try {
             ${generate.default(ast).code}
         } catch (e) {
@@ -501,6 +522,13 @@ function vallogize(path, selfId, relIds) {
         cpNames.push(types.stringLiteral(cp));
     });
 
+    // spf_block_dynamic
+    let scopeDepthId = 'undefined';
+    if (dynamicBlockScopeVarStack.length > 0) {
+        const lst = dynamicBlockScopeVarStack.length - 1;
+        scopeDepthId = dynamicBlockScopeVarStack[lst];
+    }
+
     // HACK: 順番が大事
     // このコードをrelIdsの作成完了前に持ってくると、「「自身の値」に関与する値」に「自身の値」が含まれてしまう
     if (path.node.pushIdRequest) {
@@ -529,7 +557,8 @@ function vallogize(path, selfId, relIds) {
                 types.arrayExpression(relIds),
                 types.stringLiteral(selfId),
                 types.stringLiteral(idName),
-                types.arrayExpression(cpNames)
+                types.arrayExpression(cpNames),
+                types.identifier(scopeDepthId)
             ]));
     path.mySkip = true;
 }
