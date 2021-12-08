@@ -12,6 +12,7 @@ const types = window.modules.babel_types;
 
 // special form name
 const spf_cp_exp_normal = 'cp_exp_normal';
+const spf_cp_exp_static = 'cp_exp_static';
 const spf_cp_block_static = 'cp_block_static';
 const spf_cp_block_dynamic = 'cp_block_dynamic';
 const spf_cp_assert = 'cp_assert';
@@ -25,6 +26,8 @@ const getId = (() => {
 
 /** @type {string[]} */
 let testExpIdStack;
+/** @type {string[]} */
+let staticExpCpStack;
 /** @type {string[][]} */
 let staticBlockCpStack;
 
@@ -83,6 +86,7 @@ function validateCpBlockPath(path) {
 function transform(program, option) {
     // 初期化
     testExpIdStack = [];
+    staticExpCpStack = [];
     staticBlockCpStack = [];
 
     // オプション設定
@@ -146,6 +150,24 @@ function transform(program, option) {
                                     path.node.cpNames = [];
                                 }
                                 path.node.cpNames.push(cpName);
+                                return;
+                            }
+                            case spf_cp_exp_static: {
+                                // validation
+                                validateCpExpPath(path);
+
+                                const exp = path.node.arguments[0];
+                                const cpName = path.node.arguments[1].value;
+                                // メタ情報の引継ぎ
+                                exp.getValMode = path.node.getValMode;
+                                exp.noVallogize = path.node.noVallogize;
+                                exp.pushIdRequest = path.node.pushIdRequest;
+                                exp.cpNames = path.node.cpNames; // 入れ子OK
+                                // cpNameをstaticに反映
+                                staticExpCpStack.push(cpName);
+                                // pathの繋ぎ変えはまだやらない（exitでやる）
+                                // special formを変換対象から外しておく
+                                callee.noVallogize = true;
                                 return;
                             }
                             case spf_cp_block_static: {
@@ -328,8 +350,20 @@ function transform(program, option) {
                     return;
                 }
                 case 'CallExpression': {
+                    // special formの処理
+                    const callee = path.node.callee;
+                    if (callee.type == 'Identifier' &&
+                    callee.name == spf_cp_exp_static) {
+                        staticExpCpStack.pop();
+                        const exp = path.node.arguments[0];
+                        // pathの繋ぎ変え
+                        path.replaceWith(exp);
+                        path.mySkip = true;
+                        return;
+                    }
+                    // 通常の関数呼び出しの場合の処理
                     var id = getId();
-                    var rel = [path.node.callee.relId];
+                    var rel = [callee.relId];
                     path.node.arguments.forEach(a => rel.push(a.relId));
                     vallogize(path, id, rel);
                     path.node.relId = id;
@@ -414,6 +448,10 @@ function vallogize(path, selfId, relIds) {
     if (path.node.cpNames) {
         cpNames = path.node.cpNames.map(cp => types.stringLiteral(cp));
     }
+    // spf_exp_static
+    staticExpCpStack.forEach(cp => {
+        cpNames.push(types.stringLiteral(cp));
+    });
     // spf_block_static
     staticBlockCpStack.flat().forEach(cp => {
         cpNames.push(types.stringLiteral(cp));

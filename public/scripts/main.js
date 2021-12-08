@@ -302,7 +302,8 @@ btnRun.onclick = () => {
     const code = `
         const ${spf_cp_block_static} = (cp) => undefined;
         const ${spf_cp_block_dynamic} = (cp) => undefined;
-        const ${spf_cp_exp} = (exp, cp) => exp;
+        const ${spf_cp_exp_normal} = (exp, cp) => exp;
+        const ${spf_cp_exp_static} = (exp, cp) => exp;
         const ${spf_cp_assert}= (pred) => undefined;`
         + myCodeMirror.getValue();
     // 標準出力先をすり替え
