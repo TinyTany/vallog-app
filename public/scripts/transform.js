@@ -523,7 +523,7 @@ function vallogize(path, selfId, relIds) {
     });
 
     // spf_block_dynamic
-    let scopeDepthId = 'undefined';
+    let scopeDepthId = '0';
     if (dynamicBlockScopeVarStack.length > 0) {
         const lst = dynamicBlockScopeVarStack.length - 1;
         scopeDepthId = dynamicBlockScopeVarStack[lst];

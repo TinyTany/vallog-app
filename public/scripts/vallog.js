@@ -210,7 +210,7 @@ VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps, scpd) 
     let checkpoints = cps ?? [];
     checkpoints = [...checkpoints, ...data.dynamicCpExpStack];
     // cp_block_dynamic関連
-    if (scpd) {
+    if (scpd !== undefined) {
         if (data.dynamicCpBlockStack.length != scpd) {
             // この場合，dynamicCpBlockStack.length > scpdとなっているはず...
             const popTimes = data.dynamicCpBlockStack.length - scpd;
