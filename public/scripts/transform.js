@@ -11,7 +11,7 @@ const types = window.modules.babel_types;
 // const types = require('@babel/types');
 
 // special form name
-const spf_cp_exp = 'cp_exp';
+const spf_cp_exp_normal = 'cp_exp_normal';
 const spf_cp_block_static = 'cp_block_static';
 const spf_cp_block_dynamic = 'cp_block_dynamic';
 const spf_cp_assert = 'cp_assert';
@@ -35,8 +35,35 @@ function debugLog(str) {
     }
 }
 
+/* 補助関数たち */
+
 function codePositionStr(node) {
     return `(${node.loc.start.line}:${node.loc.start.column})`;
+}
+
+function validateCpExpPath(path) {
+    // 存在&型チェック
+    if (path.node.arguments.length < 2) {
+        throw `SyntaxError: Missing arguments of ${spf_cp_exp_normal} ${codePositionStr(path.node)}`;
+    }
+    if (path.node.arguments[1].type != 'StringLiteral') {
+        throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
+    }
+}
+
+function validateCpBlockPath(path) {
+    // 存在&型チェック
+    if (path.node.arguments.length < 1) {
+        throw `SyntaxError: Missing arguments of ${spf_cp_block_static} ${codePositionStr(path.node)}`;
+    }
+    if (path.node.arguments[0].type != 'StringLiteral') {
+        throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
+    }
+    // BlockStatement内のExpressionStatementとなっているかチェック
+    if (path.parentPath.node.type != 'ExpressionStatement' ||
+    path.parentPath.parentPath.node.type != 'BlockStatement') {
+        throw `SyntaxError: ${spf_cp_block_static} must be statement in block ${codePositionStr(path.node)}`;
+    }
 }
 
 /** 
@@ -98,24 +125,23 @@ function transform(program, option) {
                 case 'CallExpression': {
                     debugLog('callexp enter');
                     const callee = path.node.callee;
+                    // special formの処理
                     if (callee.type == 'Identifier') {
                         switch (callee.name) {
-                            case spf_cp_exp: {
-                                // 存在&型チェック
-                                if (path.node.arguments.length < 2) {
-                                    throw `SyntaxError: Missing arguments of ${spf_cp_exp} ${codePositionStr(path.node)}`;
-                                }
-                                if (path.node.arguments[1].type != 'StringLiteral') {
-                                    throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
-                                }
+                            case spf_cp_exp_normal: {
+                                // validation
+                                validateCpExpPath(path);
+
                                 const exp = path.node.arguments[0];
                                 const cpName = path.node.arguments[1].value;
                                 // メタ情報の引継ぎ
                                 exp.getValMode = path.node.getValMode;
                                 exp.noVallogize = path.node.noVallogize;
                                 exp.pushIdRequest = path.node.pushIdRequest;
+                                exp.cpNames = path.node.cpNames; // 入れ子OK
                                 // pathの繋ぎ変え
                                 path.replaceWith(exp);
+                                // cpNameを付与
                                 if (!path.node.cpNames) {
                                     path.node.cpNames = [];
                                 }
@@ -123,48 +149,29 @@ function transform(program, option) {
                                 return;
                             }
                             case spf_cp_block_static: {
-                                // 存在&型チェック
-                                if (path.node.arguments.length < 1) {
-                                    throw `SyntaxError: Missing arguments of ${spf_cp_block_static} ${codePositionStr(path.node)}`;
-                                }
-                                if (path.node.arguments[0].type != 'StringLiteral') {
-                                    throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
-                                }
+                                // validation
+                                validateCpBlockPath(path);
                                 // メインの仕事
                                 const cpName = path.node.arguments[0].value;
                                 if (staticBlockCpStack.length != 0) {
                                     const lst = staticBlockCpStack.length - 1;
                                     staticBlockCpStack[lst].push(cpName);
                                 }
-                                // BlockStatement内のExpressionStatementとなっているかチェック
-                                if (path.parentPath.node.type != 'ExpressionStatement' ||
-                                path.parentPath.parentPath.node.type != 'BlockStatement') {
-                                    throw `SyntaxError: ${spf_cp_block_static} must be statement in block ${codePositionStr(path.node)}`;
-                                }
                                 path.remove();
                                 return;
                             }
                             case spf_cp_block_dynamic: {
-                                // 存在&型チェック
-                                if (path.node.arguments.length < 1) {
-                                    throw `SyntaxError: Missing arguments of ${spf_cp_block_dynamic} ${codePositionStr(path.node)}`;
-                                }
-                                if (path.node.arguments[0].type != 'StringLiteral') {
-                                    throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
-                                }
+                                // validation
+                                validateCpBlockPath(path);
                                 // メインの仕事
                                 // TODO: Not implemented yet
-                                // BlockStatement内のExpressionStatementとなっているかチェック
-                                if (path.parentPath.node.type != 'ExpressionStatement' ||
-                                path.parentPath.parentPath.node.type != 'BlockStatement') {
-                                    throw `SyntaxError: ${spf_cp_block_dynamic} must be statement ${codePositionStr(path.node)}`;
-                                }
                                 path.remove();
                                 return;
                             }
                             default: break;
                         }
                     }
+                    // 通常の関数呼び出しの場合の処理
                     callee.getValMode = true;
                     return;
                 }
@@ -403,9 +410,11 @@ function vallogize(path, selfId, relIds) {
     relIds = relIds.filter(k => k != undefined).map(k => types.identifier(`__refs['${k}']`));
     
     let cpNames = [];
+    // spf_cp_exp_normal
     if (path.node.cpNames) {
         cpNames = path.node.cpNames.map(cp => types.stringLiteral(cp));
     }
+    // spf_block_static
     staticBlockCpStack.flat().forEach(cp => {
         cpNames.push(types.stringLiteral(cp));
     });
