@@ -13,6 +13,8 @@ VALLOG.data.vals = [];
 // 値追跡処理時に使用（一時的に追跡値に名前を付けて保持）
 /** @type {Vallog[]} */
 VALLOG.data.refs = [];
+/** @type {string[]} */
+VALLOG.data.dynamicCpExpStack = [];
 // 観察対象の経路
 /** @type {{loc: LocationPair[], color: String}[]} */
 VALLOG.data.watchList = [];
@@ -20,6 +22,7 @@ VALLOG.data.watchList = [];
 VALLOG.init = () => {
     data.vals = [];
     data.refs = [];
+    data.dynamicCpExpStack = [];
     data.watchList = [];
     cls.VallogId.init();
 };
@@ -201,7 +204,9 @@ VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps) => {
     );
     let relInfos = rels.map(vllg => new cls.RelateInfo(vllg.id, vllg.traces.length - 1));
     let visitPos = new cls.VisitPosition(locPair, name);
-    return new cls.Trace(visitPos, relInfos, cps ?? []);
+    let checkpoints = cps ?? [];
+    checkpoints = [...checkpoints, ...data.dynamicCpExpStack];
+    return new cls.Trace(visitPos, relInfos, checkpoints);
 };
 
 // obj: any
@@ -224,4 +229,12 @@ VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name, cps) =
 VALLOG.function.getVal = (obj, line1, char1, line2, char2, rels, key, name, cps) => {
     let vllg = fun.pass(obj, line1, char1, line2, char2, rels, key, name, cps);
     return vllg.value;
+};
+
+VALLOG.function.dynamicCpExpPush = (cp) => {
+    data.dynamicCpExpStack.push(cp);
+};
+
+VALLOG.function.dynamicCpExpPop = () => {
+    data.dynamicCpExpStack.pop();
 };

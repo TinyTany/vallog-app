@@ -13,6 +13,7 @@ const types = window.modules.babel_types;
 // special form name
 const spf_cp_exp_normal = 'cp_exp_normal';
 const spf_cp_exp_static = 'cp_exp_static';
+const spf_cp_exp_dynamic = 'cp_exp_dynamic';
 const spf_cp_block_static = 'cp_block_static';
 const spf_cp_block_dynamic = 'cp_block_dynamic';
 const spf_cp_assert = 'cp_assert';
@@ -168,6 +169,22 @@ function transform(program, option) {
                                 // pathの繋ぎ変えはまだやらない（exitでやる）
                                 // special formを変換対象から外しておく
                                 callee.noVallogize = true;
+                                return;
+                            }
+                            case spf_cp_exp_dynamic: {
+                                // validation
+                                validateCpExpPath(path);
+
+                                const exp = path.node.arguments[0];
+                                // メタ情報の引継ぎ
+                                exp.getValMode = path.node.getValMode;
+                                exp.noVallogize = path.node.noVallogize;
+                                exp.pushIdRequest = path.node.pushIdRequest;
+                                exp.cpNames = path.node.cpNames; // 入れ子OK
+                                // pathの繋ぎ変えはまだやらない（exitでやる）
+                                // special formを変換対象から外しておく
+                                callee.noVallogize = true;
+                                path.node.arguments[1].noVallogize = true;
                                 return;
                             }
                             case spf_cp_block_static: {
@@ -361,6 +378,31 @@ function transform(program, option) {
                         path.mySkip = true;
                         return;
                     }
+                    if (callee.type == 'Identifier' &&
+                    callee.name == spf_cp_exp_dynamic) {
+                        const tmpVarIdNode = types.identifier(`__dummy${getId()}`);
+                        const exp = path.node.arguments[0];
+                        const cpName = path.node.arguments[1].value;
+                        const cpPushCallNode = types.callExpression(
+                            types.identifier('__dynamic_cp_exp_push'),
+                            [types.stringLiteral(cpName)]);
+                        const cpPopCallNode = types.callExpression(
+                            types.identifier('__dynamic_cp_exp_pop'), []);
+                        const assignNode = types.assignmentExpression(
+                            '=',
+                            tmpVarIdNode,
+                            exp);
+                        // pathの繋ぎ変え
+                        var seq = types.sequenceExpression([
+                            cpPushCallNode,
+                            assignNode,
+                            cpPopCallNode,
+                            tmpVarIdNode
+                        ]);
+                        path.replaceWith(seq);
+                        path.mySkip = true;
+                        return;
+                    }
                     // 通常の関数呼び出しの場合の処理
                     var id = getId();
                     var rel = [callee.relId];
@@ -402,9 +444,11 @@ function transform(program, option) {
     });
 
     return `(() => {
-        var __pass = VALLOG.function.pass;
-        var __getVal = VALLOG.function.getVal;
-        var __refs = VALLOG.data.refs;
+        const __pass = VALLOG.function.pass;
+        const __getVal = VALLOG.function.getVal;
+        const __refs = VALLOG.data.refs;
+        const __dynamic_cp_exp_push = VALLOG.function.dynamicCpExpPush;
+        const __dynamic_cp_exp_pop = VALLOG.function.dynamicCpExpPop;
         try {
             ${generate.default(ast).code}
         } catch (e) {
