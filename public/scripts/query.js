@@ -66,19 +66,23 @@ QUERY.class.Log = class {
     constructor(log) {
         this.#log = log;
     }
-    passCp(cp) {
+    passCp(...cps) {
         let ans = [];
         this.#log.forEach(v => {
-            if (v.traces.some(t => t.checkPoint.includes(cp))) {
+            if (v.traces.some(t => {
+                return cps.every(cp => t.checkPoint.includes(cp));
+            })) {
                 ans.push(v);
             }
         });
         return new QUERY.class.Log(ans);
     }
-    npassCp(cp) {
+    npassCp(...cps) {
         let ans = [];
         this.#log.forEach(v => {
-            if (v.traces.every(t => !t.checkPoint.includes(cp))) {
+            if (v.traces.every(t => {
+                return !cps.every(cp => t.checkPoint.includes(cp));
+            })) {
                 ans.push(v);
             }
         });
