@@ -88,28 +88,6 @@ VALLOG.class.LocationPair = class {
 };
 
 /**
- * @typedef VisitPosition
- * @property {LocationPair} locationPair
- * @property {String} name
- */
-VALLOG.class.VisitPosition = class {
-    /** @type {LocationPair} */
-    #locationPair;
-    /** @type {String} */
-    #name;
-    constructor(locationPair, name) {
-        this.#locationPair = locationPair;
-        this.#name = name;
-    }
-    get locationPair() {
-        return this.#locationPair;
-    }
-    get name() {
-        return this.#name;
-    }
-};
-
-/**
  * @typedef VallogId
  * @property {Number} id
  */
@@ -152,24 +130,24 @@ VALLOG.class.RelateInfo = class {
 
 /**
  * @typedef Trace
- * @property {VisitPosition} position
+ * @property {LocationPair} position
  * @property {RelateInfo[]} relate
  * @property {string[]} checkPoint
  */
 VALLOG.class.Trace = class {
-    /** @type {VisitPosition} */
-    #visitPosition;
+    /** @type {LocationPair} */
+    #position;
     /** @type {RelateInfo[]} */
     #relateInfo;
     /** @type {string[]} */
     #checkPoint;
     constructor(position, info, cp) {
-        this.#visitPosition = position;
+        this.#position = position;
         this.#relateInfo = info;
         this.#checkPoint = cp;
     }
     get position() {
-        return this.#visitPosition;
+        return this.#position;
     }
     get relate() {
         return this.#relateInfo;
@@ -211,24 +189,23 @@ VALLOG.class.Vallog = class {
     }
 };
 
-VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps) => {
+VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, cps) => {
     let locPair = new cls.LocationPair(
         new cls.Location(line1, char1),
         new cls.Location(line2, char2)
     );
     let relInfos = rels.map(vllg => new cls.RelateInfo(vllg.id, vllg.traces.length - 1));
-    let visitPos = new cls.VisitPosition(locPair, name);
     let checkpoints = cps ?? [];
     checkpoints = [...checkpoints, ...data.dynamicCpStack];
-    return new cls.Trace(visitPos, relInfos, checkpoints);
+    return new cls.Trace(locPair, relInfos, checkpoints);
 };
 
 // obj: any
 // line1, char1, line2, char2: number
 // rels: Vallog[]
-// key, name: string
+// key: string
 // cps: string[]
-VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name, cps) => {
+VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, cps) => {
     let tmp = obj;
     if (!(tmp instanceof cls.Vallog)) {
         tmp = new cls.Vallog(obj);
@@ -236,12 +213,12 @@ VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name, cps) =
     }
     data.refs[key] = tmp;
     // 前回と同じ場所、同じ関連する値、同じ変数名だった場合に追跡子情報を付与するorしない？
-    tmp.traces.push(fun.makeTrace(line1, char1, line2, char2, rels, name, cps));
+    tmp.traces.push(fun.makeTrace(line1, char1, line2, char2, rels, cps));
     return tmp;
 };
 
-VALLOG.function.getVal = (obj, line1, char1, line2, char2, rels, key, name, cps) => {
-    let vllg = fun.pass(obj, line1, char1, line2, char2, rels, key, name, cps);
+VALLOG.function.getVal = (obj, line1, char1, line2, char2, rels, key, cps) => {
+    let vllg = fun.pass(obj, line1, char1, line2, char2, rels, key, cps);
     return vllg.value;
 };
 

@@ -20,7 +20,7 @@ QUERY.findValue = () => {
     let found = [];
     VALLOG.data.vals.forEach(v => {
         let res = v.traces.some(t => {
-            let locp = t.position.locationPair;
+            let locp = t.position;
             let ls = locp.start;
             let le = locp.end;
             if (ls.line - 1 != from.line) {

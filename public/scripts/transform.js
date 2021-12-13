@@ -381,7 +381,6 @@ function transform(program, option) {
                             types.numericLiteral(lhs.loc.end.column),
                             types.arrayExpression([]),
                             types.stringLiteral('_'),
-                            types.identifier(lhs.name ?? '')
                         ]);
                     var seq = types.sequenceExpression([path.node, ast]);
                     path.replaceWith(seq);
@@ -590,15 +589,6 @@ function vallogize(path, selfId, relIds) {
         testExpIdStack.push(selfId);   
     }
 
-    // ここの優先順位の理由は何？
-    var idName = '';
-    if (path.node.type == 'Identifier') {
-        idName = path.node.name;
-    }
-    if (path.node.varName != undefined) {
-        idName = path.node.varName;
-    }
-
     path.replaceWith(
         types.callExpression(
             types.identifier(`${funcName}`),
@@ -610,7 +600,6 @@ function vallogize(path, selfId, relIds) {
                 types.numericLiteral(char2),
                 types.arrayExpression(relIds),
                 types.stringLiteral(selfId),
-                types.stringLiteral(idName),
                 types.arrayExpression(cpNames),
             ]));
     path.mySkip = true;
@@ -622,7 +611,7 @@ function PassExpAst(val, loc, rel) {
     let char1 = loc.start.column;
     let line2 = loc.end.line;
     let char2 = loc.end.column;
-    return template.expression.ast(`${funNamePass}(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_', '${val}')`);
+    return template.expression.ast(`${funNamePass}(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_')`);
 }
 
 // 仮引数の行を通過したことを記録するための補助関数
@@ -632,5 +621,5 @@ function PassStatAst(val, loc, rel) {
     let char1 = loc.start.column;
     let line2 = loc.end.line;
     let char2 = loc.end.column;
-    return template.statement.ast(`${funNamePass}(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_', '${val}');`);
+    return template.statement.ast(`${funNamePass}(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_');`);
 }

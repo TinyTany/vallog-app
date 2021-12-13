@@ -610,7 +610,7 @@ function showTrace(id) {
         throw `Invalid index ${id}`;
     }
     let v = vals[id].traces;
-    v = v.map(v => v.position.locationPair);
+    v = v.map(v => v.position);
     VALLOG.data.watchList.push({loc: v, color: getColor(id)});
     draw();
     return 'OK';
