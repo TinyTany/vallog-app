@@ -211,7 +211,7 @@ VALLOG.class.Vallog = class {
     }
 };
 
-VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps, scpd) => {
+VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps) => {
     let locPair = new cls.LocationPair(
         new cls.Location(line1, char1),
         new cls.Location(line2, char2)
@@ -219,18 +219,7 @@ VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps, scpd) 
     let relInfos = rels.map(vllg => new cls.RelateInfo(vllg.id, vllg.traces.length - 1));
     let visitPos = new cls.VisitPosition(locPair, name);
     let checkpoints = cps ?? [];
-    checkpoints = [...checkpoints, ...data.dynamicCpExpStack];
-    // cp_block_dynamic関連
-    if (scpd !== undefined) {
-        if (data.dynamicCpBlockStack.length != scpd) {
-            // この場合，dynamicCpBlockStack.length > scpdとなっているはず...
-            const popTimes = data.dynamicCpBlockStack.length - scpd;
-            for (let i = 0; i < popTimes; ++i) {
-                data.dynamicCpBlockStack.pop();
-            }
-        }
-        checkpoints = [...checkpoints, ...data.dynamicCpBlockStack.flat()];
-    }
+    checkpoints = [...checkpoints, ...data.dynamicCpStack];
     return new cls.Trace(visitPos, relInfos, checkpoints);
 };
 
@@ -239,7 +228,7 @@ VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, name, cps, scpd) 
 // rels: Vallog[]
 // key, name: string
 // cps: string[]
-VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name, cps, scpd) => {
+VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name, cps) => {
     let tmp = obj;
     if (!(tmp instanceof cls.Vallog)) {
         tmp = new cls.Vallog(obj);
@@ -247,12 +236,12 @@ VALLOG.function.pass = (obj, line1, char1, line2, char2, rels, key, name, cps, s
     }
     data.refs[key] = tmp;
     // 前回と同じ場所、同じ関連する値、同じ変数名だった場合に追跡子情報を付与するorしない？
-    tmp.traces.push(fun.makeTrace(line1, char1, line2, char2, rels, name, cps, scpd));
+    tmp.traces.push(fun.makeTrace(line1, char1, line2, char2, rels, name, cps));
     return tmp;
 };
 
-VALLOG.function.getVal = (obj, line1, char1, line2, char2, rels, key, name, cps, scpd) => {
-    let vllg = fun.pass(obj, line1, char1, line2, char2, rels, key, name, cps, scpd);
+VALLOG.function.getVal = (obj, line1, char1, line2, char2, rels, key, name, cps) => {
+    let vllg = fun.pass(obj, line1, char1, line2, char2, rels, key, name, cps);
     return vllg.value;
 };
 

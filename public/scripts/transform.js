@@ -17,6 +17,15 @@ const spf_cp_exp_dynamic = 'cp_exp_dynamic';
 const spf_cp_block_static = 'cp_block_static';
 const spf_cp_block_dynamic = 'cp_block_dynamic';
 const spf_cp_assert = 'cp_assert';
+const dynamicCpPush = '__DY_CP_PUSH';
+const dynamicCpExpSave = '__DY_EXP_SAVE';
+const dynamicCpExpRestore = '__DY_EXP_RESTORE';
+const dynamicCpBlockSave = '__DY_BLK_SAVE';
+const dynamicCpBlockRestore = '__DY_BLK_RESTORE';
+const dynamicCpFunctionSave = '__DY_FUN_SAVE';
+const dynamicCpFunctionRestore = '__DY_FUN_RESTORE';
+const dynamicCpExceptionSave = '__DY_EXCP_SAVE';
+const dynamicCpExceptionRestore = '__DY_EXCP_RESTORE';
 
 const getId = (() => {
     let id = 0;
@@ -31,8 +40,6 @@ let testExpIdStack;
 let staticExpCpStack;
 /** @type {string[][]} */
 let staticBlockCpStack;
-/** @type {string[]} */
-let dynamicBlockScopeVarStack;
 
 const debugMode = false;
 function debugLog(str) {
@@ -91,7 +98,6 @@ function transform(program, option) {
     testExpIdStack = [];
     staticExpCpStack = [];
     staticBlockCpStack = [];
-    dynamicBlockScopeVarStack = [];
 
     // オプション設定
     const implcpArrayRef = option?.implcp?.arrayRef ?? false;
@@ -205,7 +211,7 @@ function transform(program, option) {
                                 // validation
                                 validateCpBlockPath(path);
                                 // メインの仕事
-                                callee.name = '__dynamicCpBlockStackPush';
+                                callee.name = dynamicCpPush;
                                 path.get('callee').mySkip = true;
                                 path.get('arguments').forEach(p => p.mySkip = true);
                                 return;
@@ -220,18 +226,51 @@ function transform(program, option) {
                 case 'BlockStatement': {
                     // spf_cp_block_static
                     staticBlockCpStack.push([]);
-                    // spf_cp_block_dynamic
-                    const scopeVarName = `__scope_depth_${getId()}`;
-                    dynamicBlockScopeVarStack.push(scopeVarName)
-                    const newNode1 = template.statement.ast(
-                        `__dynamicCpBlockNewFrame();`);
-                    const newNode2 = template.statement.ast(
-                        `let ${scopeVarName} = __dynamicCpBlockStackLen();`
-                    );
-                    path.unshiftContainer('body', newNode2);
-                    path.unshiftContainer('body', newNode1);
+                    // dynamicCp関連
+                    // restore用コードもここで挿入している
+                    // ※もし，ほかのノードでブロックの末尾に何かを挿入するものがあるなら，
+                    // restore用コードはexitのBlockStatementで挿入しなければならない
+                    const parentType = path.parentPath.node.type;
+                    if (parentType === 'FunctionDeclaration' ||
+                    parentType === 'ArrowFunctionExpression') {
+                        // save
+                        const cpFunSaveNode = template.statement.ast(`${dynamicCpFunctionSave}()`);
+                        path.unshiftContainer('body', cpFunSaveNode);
+                        path.get('body.0').mySkip = true;
+                        // restore
+                        const cpFunRestoreNode = template.statement.ast(`${dynamicCpFunctionRestore}()`);
+                        path.pushContainer('body', cpFunRestoreNode);
+                        const lst = path.node.body.length - 1;
+                        path.get(`body.${lst}`).mySkip = true;
+                        return;
+                    }
+                    if (parentType === 'TryStatement') {
+                        // save
+                        const cpExcpSaveNode = template.statement.ast(`${dynamicCpExceptionSave}()`);
+                        path.unshiftContainer('body', cpExcpSaveNode);
+                        path.get('body.0').mySkip = true;
+                        // restore
+                        const cpExcpRestoreNode = template.statement.ast(`${dynamicCpExceptionRestore}()`);
+                        path.pushContainer('body', cpExcpRestoreNode);
+                        const lst = path.node.body.length - 1;
+                        path.get(`body.${lst}`).mySkip = true;
+                        return;
+                    }
+                    // save
+                    const cpBlockSaveNode = template.statement.ast(`${dynamicCpBlockSave}()`);
+                    path.unshiftContainer('body', cpBlockSaveNode);
                     path.get('body.0').mySkip = true;
-                    path.get('body.1').mySkip = true;
+                    // restore
+                    const cpBlockRestoreNode = template.statement.ast(`${dynamicCpBlockRestore}()`);
+                    path.pushContainer('body', cpBlockRestoreNode);
+                    const lst = path.node.body.length - 1;
+                    path.get(`body.${lst}`).mySkip = true;
+                    if (parentType === 'CatchClause') {
+                        // restore
+                        const cpExcpRestoreNode = template.statement.ast(`${dynamicCpExceptionRestore}()`);
+                        path.unshiftContainer('body', cpExcpRestoreNode);
+                        path.get('body.0').mySkip = true;
+                    }
                     return;
                 }
                 case 'ReturnStatement': {
@@ -398,20 +437,19 @@ function transform(program, option) {
                         const tmpVarIdNode = types.identifier(`__dummy${getId()}`);
                         const exp = path.node.arguments[0];
                         const cpName = path.node.arguments[1].value;
-                        const cpPushCallNode = types.callExpression(
-                            types.identifier('__dynamic_cp_exp_push'),
-                            [types.stringLiteral(cpName)]);
-                        const cpPopCallNode = types.callExpression(
-                            types.identifier('__dynamic_cp_exp_pop'), []);
+                        const cpSaveNode = template.expression.ast(`${dynamicCpExpSave}()`);
+                        const cpPushNode = template.expression.ast(`${dynamicCpPush}('${cpName}')`);
+                        const cpRestoreNode = template.expression.ast(`${dynamicCpExpRestore}()`);
                         const assignNode = types.assignmentExpression(
                             '=',
                             tmpVarIdNode,
                             exp);
                         // pathの繋ぎ変え
                         var seq = types.sequenceExpression([
-                            cpPushCallNode,
+                            cpSaveNode,
+                            cpPushNode,
                             assignNode,
-                            cpPopCallNode,
+                            cpRestoreNode,
                             tmpVarIdNode
                         ]);
                         path.replaceWith(seq);
@@ -430,12 +468,24 @@ function transform(program, option) {
                 case 'BlockStatement': {
                     // spf_cp_block_static
                     staticBlockCpStack.pop();
-                    // spf_cp_block_dynamic
-                    dynamicBlockScopeVarStack.pop();
                     return;
                 }
                 case 'ReturnStatement': {
                     debugLog('return exit');
+                    const argNode = path.node.argument ?? types.identifier('undefined');
+                    const tmpVarIdNode = types.identifier(`__DUMMY_${getId()}`);
+                    const assignNode = types.assignmentExpression(
+                        '=',
+                        tmpVarIdNode,
+                        argNode);
+                    const restoreNode = template.expression.ast(`${dynamicCpFunctionRestore}()`);
+                    const newNode = types.sequenceExpression([
+                        assignNode,
+                        restoreNode,
+                        tmpVarIdNode
+                    ]);
+                    path.get('argument').replaceWith(newNode);
+                    path.get('argument').mySkip = true;
                     return;
                 }
                 case 'MemberExpression': {
@@ -465,16 +515,22 @@ function transform(program, option) {
         const __pass = VALLOG.function.pass;
         const __getVal = VALLOG.function.getVal;
         const __refs = VALLOG.data.refs;
-        const __dynamic_cp_exp_push = VALLOG.function.dynamicCpExpPush;
-        const __dynamic_cp_exp_pop = VALLOG.function.dynamicCpExpPop;
-        const __dynamicCpBlockStackLen = VALLOG.function.dynamicCpBlockStackLen;
-        const __dynamicCpBlockStackPush = VALLOG.function.dynamicCpBlockStackPush;
-        const __dynamicCpBlockNewFrame = VALLOG.function.dynamicCpBlockNewFrame;
+        const ${dynamicCpPush} = VALLOG.function.dynamicCpPush;
+        const ${dynamicCpExpSave} = VALLOG.function.dynamicCpExpStackSave;
+        const ${dynamicCpExpRestore} = VALLOG.function.dynamicCpExpStackRestore;
+        const ${dynamicCpBlockSave} = VALLOG.function.dynamicCpBlockStackSave;
+        const ${dynamicCpBlockRestore} = VALLOG.function.dynamicCpBlockStackRestore;
+        const ${dynamicCpFunctionSave} = VALLOG.function.dynamicCpFunctionStackSave;
+        const ${dynamicCpFunctionRestore} = VALLOG.function.dynamicCpFunctionStackRestore;
+        const ${dynamicCpExceptionSave} = VALLOG.function.dynamicCpExceptionStackSave;
+        const ${dynamicCpExceptionRestore} = VALLOG.function.dynamicCpExceptionStackRestore;
+        
         try {
             ${generate.default(ast).code}
         } catch (e) {
             console.error(e);
         }
+
         return VALLOG.data.vals;
     })();`;
 }
@@ -522,13 +578,6 @@ function vallogize(path, selfId, relIds) {
         cpNames.push(types.stringLiteral(cp));
     });
 
-    // spf_block_dynamic
-    let scopeDepthId = '0';
-    if (dynamicBlockScopeVarStack.length > 0) {
-        const lst = dynamicBlockScopeVarStack.length - 1;
-        scopeDepthId = dynamicBlockScopeVarStack[lst];
-    }
-
     // HACK: 順番が大事
     // このコードをrelIdsの作成完了前に持ってくると、「「自身の値」に関与する値」に「自身の値」が含まれてしまう
     if (path.node.pushIdRequest) {
@@ -558,7 +607,6 @@ function vallogize(path, selfId, relIds) {
                 types.stringLiteral(selfId),
                 types.stringLiteral(idName),
                 types.arrayExpression(cpNames),
-                types.identifier(scopeDepthId)
             ]));
     path.mySkip = true;
 }
