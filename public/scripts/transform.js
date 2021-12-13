@@ -11,12 +11,17 @@ const types = window.modules.babel_types;
 // const types = require('@babel/types');
 
 // special form name
-const spf_cp_exp_normal = 'cp_exp_normal';
-const spf_cp_exp_static = 'cp_exp_static';
-const spf_cp_exp_dynamic = 'cp_exp_dynamic';
-const spf_cp_block_static = 'cp_block_static';
-const spf_cp_block_dynamic = 'cp_block_dynamic';
-const spf_cp_assert = 'cp_assert';
+const spf_cp_exp_normal = 'MK_EXP';
+const spf_cp_exp_static = 'MK_EXP_ST';
+const spf_cp_exp_dynamic = 'MK_EXP_DY';
+const spf_cp_block_static = 'MK_BLK_ST';
+const spf_cp_block_dynamic = 'MK_BLK_DY';
+const spf_cp_assert = 'MK_ASSERT';
+
+const funNamePass = '__PASS_VAL';
+const funNameGetVal = '__GET_VAL';
+const VarNameRefs = '__VAR_REFS';
+
 const dynamicCpPush = '__DY_CP_PUSH';
 const dynamicCpExpSave = '__DY_EXP_SAVE';
 const dynamicCpExpRestore = '__DY_EXP_RESTORE';
@@ -30,7 +35,7 @@ const dynamicCpExceptionRestore = '__DY_EXCP_RESTORE';
 const getId = (() => {
     let id = 0;
     return () => {
-        return `id${id++}`;
+        return `ID_${id++}`;
     };
 })();
 
@@ -358,16 +363,16 @@ function transform(program, option) {
                     }
                     var lhs = path.node.id;
                     var ast = PassExpAst(lhs.name, lhs.loc, '[]');
-                    var node = types.variableDeclarator(types.identifier(`__dummy${getId()}`), ast);
+                    var node = types.variableDeclarator(types.identifier(`__DUMMY_${getId()}`), ast);
                     path.insertAfter(node);
-                    path.getSibling(path.key + 1).mySkip = true;
+                    path.getNextSibling().mySkip = true;
                     return;
                 }
                 case 'AssignmentExpression': {
                     // HACK: 副作用を起こすgetterに対して不適切な実装
                     var lhs = path.node.left;
                     var ast = types.callExpression(
-                        types.identifier(`__pass`),
+                        types.identifier(funNamePass),
                         [
                             lhs,
                             types.numericLiteral(lhs.loc.start.line),
@@ -434,7 +439,7 @@ function transform(program, option) {
                     }
                     if (callee.type == 'Identifier' &&
                     callee.name == spf_cp_exp_dynamic) {
-                        const tmpVarIdNode = types.identifier(`__dummy${getId()}`);
+                        const tmpVarIdNode = types.identifier(`__DUMMY_${getId()}`);
                         const exp = path.node.arguments[0];
                         const cpName = path.node.arguments[1].value;
                         const cpSaveNode = template.expression.ast(`${dynamicCpExpSave}()`);
@@ -512,9 +517,9 @@ function transform(program, option) {
     });
 
     return `(() => {
-        const __pass = VALLOG.function.pass;
-        const __getVal = VALLOG.function.getVal;
-        const __refs = VALLOG.data.refs;
+        const ${funNamePass} = VALLOG.function.pass;
+        const ${funNameGetVal} = VALLOG.function.getVal;
+        const ${VarNameRefs} = VALLOG.data.refs;
         const ${dynamicCpPush} = VALLOG.function.dynamicCpPush;
         const ${dynamicCpExpSave} = VALLOG.function.dynamicCpExpStackSave;
         const ${dynamicCpExpRestore} = VALLOG.function.dynamicCpExpStackRestore;
@@ -540,10 +545,10 @@ function vallogize(path, selfId, relIds) {
         path.node.noVallogize = false;
         return;
     }
-    var funcName = '__pass';
+    var funcName = funNamePass;
     if (path.node.getValMode) {
         path.node.getValMode = false;
-        funcName = '__getVal';
+        funcName = funNameGetVal;
     }
     var line1 = path.node.loc.start.line;
     var char1 = path.node.loc.start.column;
@@ -562,7 +567,7 @@ function vallogize(path, selfId, relIds) {
         relIds.push(testExpIdStack[lst]);
     }
     
-    relIds = relIds.filter(k => k != undefined).map(k => types.identifier(`__refs['${k}']`));
+    relIds = relIds.filter(k => k != undefined).map(k => types.identifier(`${VarNameRefs}['${k}']`));
     
     let cpNames = [];
     // spf_cp_exp_normal
@@ -617,7 +622,7 @@ function PassExpAst(val, loc, rel) {
     let char1 = loc.start.column;
     let line2 = loc.end.line;
     let char2 = loc.end.column;
-    return template.expression.ast(`__pass(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_', '${val}')`);
+    return template.expression.ast(`${funNamePass}(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_', '${val}')`);
 }
 
 // 仮引数の行を通過したことを記録するための補助関数
@@ -627,5 +632,5 @@ function PassStatAst(val, loc, rel) {
     let char1 = loc.start.column;
     let line2 = loc.end.line;
     let char2 = loc.end.column;
-    return template.statement.ast(`__pass(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_', '${val}');`);
+    return template.statement.ast(`${funNamePass}(${val}, ${line1}, ${char1}, ${line2}, ${char2}, ${rel}, '_', '${val}');`);
 }
