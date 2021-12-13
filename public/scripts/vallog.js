@@ -13,10 +13,18 @@ VALLOG.data.vals = [];
 // 値追跡処理時に使用（一時的に追跡値に名前を付けて保持）
 /** @type {Vallog[]} */
 VALLOG.data.refs = [];
+
 /** @type {string[]} */
+VALLOG.data.dynamicCpStack = [];
+/** @type {number[]} */
 VALLOG.data.dynamicCpExpStack = [];
-/** @type {string[][]} */
+/** @type {number[]} */
 VALLOG.data.dynamicCpBlockStack = [];
+/** @type {{block: number,　excep: number, cp:number}[]} */
+VALLOG.data.dynamicCpFunctionStack = [];
+/** @type {{exp: number, block: number, fun: number, cp: number}[]} */
+VALLOG.data.dynamicCpExceptionStack = [];
+
 // 観察対象の経路
 /** @type {{loc: LocationPair[], color: String}[]} */
 VALLOG.data.watchList = [];
@@ -24,8 +32,11 @@ VALLOG.data.watchList = [];
 VALLOG.init = () => {
     data.vals = [];
     data.refs = [];
+    data.dynamicCpStack = [];
     data.dynamicCpExpStack = [];
     data.dynamicCpBlockStack = [];
+    data.dynamicCpFunctionStack = [];
+    data.dynamicCpExceptionStack = [];
     data.watchList = [];
     cls.VallogId.init();
 };
@@ -245,27 +256,67 @@ VALLOG.function.getVal = (obj, line1, char1, line2, char2, rels, key, name, cps,
     return vllg.value;
 };
 
-// cp_exp_dynamic関連
+// dynamicCp関連
 
-VALLOG.function.dynamicCpExpPush = (cp) => {
-    data.dynamicCpExpStack.push(cp);
+VALLOG.function.dynamicCpPush = (cp) => {
+    data.dynamicCpStack.push(cp);
 };
 
-VALLOG.function.dynamicCpExpPop = () => {
-    data.dynamicCpExpStack.pop();
+VALLOG.function.dynamicCpExpStackSave = () => {
+    data.dynamicCpExpStack.push(data.dynamicCpStack.length);
 };
 
-// cp_block_dynamic関連
+VALLOG.function.dynamicCpExpStackRestore = () => {
+    let len = data.dynamicCpExpStack.pop();
+    fun.restoreStack(data.dynamicCpStack, len);
+};
 
-VALLOG.function.dynamicCpBlockStackLen = () => {
-    return data.dynamicCpBlockStack.length;
-}
+VALLOG.function.dynamicCpBlockStackSave = () => {
+    data.dynamicCpBlockStack.push(data.dynamicCpStack.length);
+};
 
-VALLOG.function.dynamicCpBlockStackPush = (cp) => {
-    const lst = data.dynamicCpBlockStack.length - 1;
-    data.dynamicCpBlockStack[lst].push(cp);
-}
+VALLOG.function.dynamicCpBlockStackRestore = () => {
+    let len = data.dynamicCpBlockStack.pop();
+    fun.restoreStack(data.dynamicCpStack, len);
+};
 
-VALLOG.function.dynamicCpBlockNewFrame = () => {
-    data.dynamicCpBlockStack.push([]);
-}
+VALLOG.function.dynamicCpFunctionStackSave = () => {
+    data.dynamicCpFunctionStack.push({
+        block: data.dynamicCpBlockStack.length,
+        excep: data.dynamicCpExceptionStack.length,
+        cp: data.dynamicCpStack.length
+    });
+};
+
+VALLOG.function.dynamicCpFunctionStackRestore = () => {
+    let item = data.dynamicCpFunctionStack.pop();
+    fun.restoreStack(data.dynamicCpBlockStack, item.block);
+    fun.restoreStack(data.dynamicCpExceptionStack, item.excep);
+    fun.restoreStack(data.dynamicCpStack, item.cp);
+};
+
+VALLOG.function.dynamicCpExceptionStackSave = () => {
+    data.dynamicCpExceptionStack.push({
+        exp: data.dynamicCpExpStack.length,
+        block: data.dynamicCpBlockStack.length,
+        fun: data.dynamicCpFunctionStack.length,
+        cp: data.dynamicCpStack.length
+    });
+};
+
+VALLOG.function.dynamicCpExceptionStackRestore = () => {
+    let item = data.dynamicCpExceptionStack.pop();
+    fun.restoreStack(data.dynamicCpExpStack, item.exp);
+    fun.restoreStack(data.dynamicCpBlockStack, item.block);
+    fun.restoreStack(data.dynamicCpFunctionStack, item.fun);
+    fun.restoreStack(data.dynamicCpStack, item.cp);
+};
+
+VALLOG.function.restoreStack = (st, len) => {
+    if (st.length <= len) {
+        return;
+    }
+    for (let i = 0; i < st.length - len; ++i) {
+        st.pop();
+    }
+};
