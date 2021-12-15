@@ -368,7 +368,7 @@ btnStartDebug.onclick = () => {
     window.context = {
         vals: vals,
         showTrace: showTrace,
-        showTraces: showTraces,
+        hideTrace: hideTrace,
         query: QUERY,
         LOG: new QUERY.class.Log(vals),
         clear: () => { VALLOG.data.watchList = []; draw(); return 'OK'; }
@@ -604,22 +604,28 @@ let draw = () => {
 draw();
 
 // for debug
-function showTrace(id) {
+function showTrace_sub(id) {
     let vals = VALLOG.data.vals;
     if (id < 0 || vals.length <= id) {
-        throw `Invalid index ${id}`;
+        return `Invalid id: ${id}`;
     }
     let v = vals[id].traces;
     v = v.map(v => v.position);
-    VALLOG.data.watchList.push({loc: v, color: getColor(id)});
+    VALLOG.data.watchList.push({id: id, loc: v, color: getColor(id)});
     draw();
+    return `OK(id: ${id})`;
+}
+
+function showTrace(...ids) {
+    ids.forEach(id => {
+        showTrace_sub(id);
+    });
     return 'OK';
 }
 
-function showTraces(ids) {
-    ids.forEach(id => {
-        showTrace(id);
-    });
+function hideTrace(...ids) {
+    VALLOG.data.watchList = VALLOG.data.watchList.filter(x => !ids.includes(x.id));
+    draw();
     return 'OK';
 }
 
