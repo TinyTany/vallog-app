@@ -136,6 +136,10 @@ function transform(program, option) {
                     path.node.right.getValMode = true;
                     return;
                 }
+                case 'NewExpression': {
+                    path.node.callee.getValMode = true;
+                    return;
+                }
                 case 'Identifier': {
                     debugLog(`id enter(${path.node.name})`);
                     return;
@@ -395,6 +399,8 @@ function transform(program, option) {
                     debugLog(`binexp(logexp) exit(${path.node.operator})`);
                     return;
                 }
+                case 'NewExpression':
+                case 'ThisExpression':
                 case 'NullLiteral':
                 case 'StringLiteral':
                 case 'BooleanLiteral':
