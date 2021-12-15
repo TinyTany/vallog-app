@@ -88,6 +88,66 @@ QUERY.class.Log = class {
         });
         return new QUERY.class.Log(ans);
     }
+    existMkrHst(mkrl, rel, mkrr) {
+        const pred = QUERY.data.funEnv[rel];
+        if (!pred) {
+            return undefined;
+        }
+        let ans = [];
+        this.#log.forEach(v => {
+            if (v.traces.some(t => {
+                return pred(t.markers, mkrl, mkrr);
+            })) {
+                ans.push(v);
+            }
+        });
+        return new QUERY.class.Log(ans);
+    }
+    nexistMkrHst(mkrl, rel, mkrr) {
+        const pred = QUERY.data.funEnv[rel];
+        if (!pred) {
+            return undefined;
+        }
+        let ans = [];
+        this.#log.forEach(v => {
+            if (v.traces.every(t => {
+                return !pred(t.markers, mkrl, mkrr);
+            })) {
+                ans.push(v);
+            }
+        });
+        return new QUERY.class.Log(ans);
+    }
+    forallMkrHst(mkrl, rel, mkrr) {
+        const pred = QUERY.data.funEnv[rel];
+        if (!pred) {
+            return undefined;
+        }
+        let ans = [];
+        this.#log.forEach(v => {
+            if (v.traces.every(t => {
+                return pred(t.markers, mkrl, mkrr);
+            })) {
+                ans.push(v);
+            }
+        });
+        return new QUERY.class.Log(ans);
+    }
+    nforallMkrHst(mkrl, rel, mkrr) {
+        const pred = QUERY.data.funEnv[rel];
+        if (!pred) {
+            return undefined;
+        }
+        let ans = [];
+        this.#log.forEach(v => {
+            if (v.traces.some(t => {
+                return !pred(t.markers, mkrl, mkrr);
+            })) {
+                ans.push(v);
+            }
+        });
+        return new QUERY.class.Log(ans);
+    }
     inspect(depth, ops) {
         return this.#log;
     }
@@ -95,3 +155,19 @@ QUERY.class.Log = class {
         return this.#log.length;
     }
 };
+
+QUERY.data.funEnv = [];
+{
+    const env = QUERY.data.funEnv;
+    env['DURING'] = (mkrs, lhs, rhs) => {
+        return !mkrs.includes(lhs) || mkrs.includes(rhs);
+    }
+    env['INTERSECT'] = (mkrs, lhs, rhs) => {
+        return mkrs.includes(lhs) && mkrs.includes(rhs);
+    }
+    env['SEPARATE'] = (mkrs, lhs, rhs) => {
+        let or = mkrs.includes(lhs) || mkrs.includes(rhs);
+        let and = mkrs.includes(lhs) && mkrs.includes(rhs);
+        return or && !and;
+    }
+}
