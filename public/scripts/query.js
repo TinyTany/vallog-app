@@ -66,22 +66,22 @@ QUERY.class.Log = class {
     constructor(log) {
         this.#log = log;
     }
-    passCp(...cps) {
+    hasMkr(...mkrs) {
         let ans = [];
         this.#log.forEach(v => {
             if (v.traces.some(t => {
-                return cps.every(cp => t.checkPoint.includes(cp));
+                return mkrs.every(mkr => t.markers.includes(mkr));
             })) {
                 ans.push(v);
             }
         });
         return new QUERY.class.Log(ans);
     }
-    npassCp(...cps) {
+    nhasMkr(...mkrs) {
         let ans = [];
         this.#log.forEach(v => {
             if (v.traces.every(t => {
-                return !cps.every(cp => t.checkPoint.includes(cp));
+                return !mkrs.every(mkr => t.markers.includes(mkr));
             })) {
                 ans.push(v);
             }

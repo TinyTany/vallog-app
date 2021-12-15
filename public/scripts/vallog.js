@@ -132,7 +132,7 @@ VALLOG.class.RelateInfo = class {
  * @typedef Trace
  * @property {LocationPair} position
  * @property {RelateInfo[]} relate
- * @property {string[]} checkPoint
+ * @property {string[]} markers
  */
 VALLOG.class.Trace = class {
     /** @type {LocationPair} */
@@ -140,11 +140,11 @@ VALLOG.class.Trace = class {
     /** @type {RelateInfo[]} */
     #relateInfo;
     /** @type {string[]} */
-    #checkPoint;
-    constructor(position, info, cp) {
+    #markers;
+    constructor(position, info, mkrs) {
         this.#position = position;
         this.#relateInfo = info;
-        this.#checkPoint = cp;
+        this.#markers = mkrs;
     }
     get position() {
         return this.#position;
@@ -152,8 +152,8 @@ VALLOG.class.Trace = class {
     get relate() {
         return this.#relateInfo;
     }
-    get checkPoint() {
-        return this.#checkPoint;
+    get markers() {
+        return this.#markers;
     }
 };
 
@@ -195,9 +195,9 @@ VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, cps) => {
         new cls.Location(line2, char2)
     );
     let relInfos = rels.map(vllg => new cls.RelateInfo(vllg.id, vllg.traces.length - 1));
-    let checkpoints = cps ?? [];
-    checkpoints = [...checkpoints, ...data.dynamicCpStack];
-    return new cls.Trace(locPair, relInfos, checkpoints);
+    let markers = cps ?? [];
+    markers = [...markers, ...data.dynamicCpStack];
+    return new cls.Trace(locPair, relInfos, markers);
 };
 
 // obj: any
