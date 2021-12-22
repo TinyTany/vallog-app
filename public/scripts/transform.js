@@ -66,7 +66,7 @@ function validateCpExpPath(path) {
         throw `SyntaxError: Missing arguments ${codePositionStr(path.node)}`;
     }
     if (path.node.arguments[1].type != 'StringLiteral') {
-        throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
+        throw `SyntaxError: Marker name must be string literal ${codePositionStr(path.node)}`
     }
 }
 
@@ -76,12 +76,12 @@ function validateCpBlockPath(path) {
         throw `SyntaxError: Missing arguments ${codePositionStr(path.node)}`;
     }
     if (path.node.arguments[0].type != 'StringLiteral') {
-        throw `SyntaxError: Checkpoint name must be string literal ${codePositionStr(path.node)}`
+        throw `SyntaxError: Marker name must be string literal ${codePositionStr(path.node)}`
     }
     // BlockStatement内のExpressionStatementとなっているかチェック
     if (path.parentPath.node.type != 'ExpressionStatement' ||
     path.parentPath.parentPath.node.type != 'BlockStatement') {
-        throw `SyntaxError: cp_block must be statement in block ${codePositionStr(path.node)}`;
+        throw `SyntaxError: MK_BLK must be statement in block ${codePositionStr(path.node)}`;
     }
 }
 
@@ -337,9 +337,7 @@ function transform(program, option) {
                     return;
                 }
                 case 'ExpressionStatement': {
-                    // void関数呼出の返値undefinedなどの不要な追跡値を防止
-                    // HACK: ExpressionStatementになるのは関数呼び出しだけではないので，この対処は不適切かも
-                    path.node.expression.noVallogize = true;
+                    // void関数呼出の返値undefinedなどにも不要な追跡子が付くが，それでよい
                     return;
                 }
                 default:
