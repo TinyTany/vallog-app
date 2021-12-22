@@ -26,7 +26,7 @@ VALLOG.data.dynamicCpFunctionStack = [];
 VALLOG.data.dynamicCpExceptionStack = [];
 
 // 観察対象の経路
-/** @type {{loc: LocationPair[], color: String}[]} */
+/** @type {{loc: LocationPair[], color: string}[]} */
 VALLOG.data.watchList = [];
 
 VALLOG.init = () => {
@@ -44,12 +44,12 @@ VALLOG.init = () => {
 // Location型はすでにあり、@typedefでは上書きされない...
 /**
  * @typedef MyLocation
- * @property {Number} line
- * @property {Number} ch */
+ * @property {number} line
+ * @property {number} ch */
 VALLOG.class.Location = class {
-    /** @type {Number} */
+    /** @type {number} */
     #line = 0; // 1-indexed
-    /** @type {Number} */
+    /** @type {number} */
     #char = 0; // 0-indexed
     constructor(line, char) {
         this.#line = line;
@@ -89,11 +89,11 @@ VALLOG.class.LocationPair = class {
 
 /**
  * @typedef VallogId
- * @property {Number} id
+ * @property {number} id
  */
 VALLOG.class.VallogId = class {
     static #__id = 0;
-    /** @type {Number} */
+    /** @type {number} */
     #id;
     constructor() {
         this.#id = cls.VallogId.#__id++;
@@ -108,20 +108,20 @@ VALLOG.class.VallogId = class {
 
 /**
  * @typedef RelateInfo
- * @property {VallogId} id
- * @property {Number} time
+ * @property {number} id
+ * @property {number} time
  */
 VALLOG.class.RelateInfo = class {
     /** @type {VallogId} */
     #relateValId;
-    /** @type {Number} */
+    /** @type {number} */
     #relateTime;
     constructor(id, time) {
         this.#relateValId = id;
         this.#relateTime = time;
     }
     get id() {
-        return this.#relateValId;
+        return this.#relateValId.id;
     }
     get time() {
         return this.#relateTime;
@@ -159,7 +159,7 @@ VALLOG.class.Trace = class {
 
 /**
  * @typedef Vallog
- * @property {VallogId} id
+ * @property {number} id
  * @property {any} value
  * @property {Trace[]} traces
  */
@@ -176,7 +176,7 @@ VALLOG.class.Vallog = class {
         this.#traceInfo = [];
     }
     get id() {
-        return this.#id;
+        return this.#id.id;
     }
     get value() {
         return this.#value;
@@ -185,7 +185,7 @@ VALLOG.class.Vallog = class {
         return this.#traceInfo;
     }
     inspect(depth, opts) {
-        return {id: this.id.id, value: this.value};
+        return {id: this.id, value: this.value};
     }
 };
 

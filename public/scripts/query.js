@@ -4,7 +4,7 @@ QUERY.class = QUERY.class || {};
 
 // 取得した値情報をすべて表示する（idと値の表記）
 QUERY.valueList = () => {
-    return VALLOG.data.vals.map(v => ({id: v.id.id, value: v.value}));
+    return VALLOG.data.vals.map(v => ({id: v.id, value: v.value}));
 };
 
 // コードエディタ上で選択された式を通過した値を検索
@@ -38,7 +38,7 @@ QUERY.findValue = () => {
             return true;
         });
         if (res) {
-            found.push({id: v.id.id, value: v.value});
+            found.push({id: v.id, value: v.value});
         }
     });
 
@@ -54,7 +54,7 @@ QUERY.findGen = (...ids) => {
             return;
         }
         const gens = 
-            vllg.traces[0].relate.map(r => ({id: r.id.id, value: VALLOG.data.vals[r.id.id].value}));
+            vllg.traces[0].relate.map(r => ({id: r.id, value: VALLOG.data.vals[r.id].value}));
         const ansIds = ans.map(v => v.id);
         gens.forEach(gen => {
             if (!ansIds.includes(gen.id)) {
