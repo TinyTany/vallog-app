@@ -305,7 +305,8 @@ btnRun.onclick = () => {
         const ${spf_cp_exp_normal} = (exp, cp) => exp;
         const ${spf_cp_exp_static} = (exp, cp) => exp;
         const ${spf_cp_exp_dynamic} = (exp, cp) => exp;
-        const ${spf_cp_assert}= (pred) => undefined;`
+        const ${spf_cp_assert} = (pred) => undefined;
+        const ${spf_detach_tracer} = (exp) => exp;`
         + myCodeMirror.getValue();
     // 標準出力先をすり替え
     console.setOutput(termOut);

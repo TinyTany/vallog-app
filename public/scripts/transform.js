@@ -17,6 +17,7 @@ const spf_cp_exp_dynamic = 'MK_EXP_DY';
 const spf_cp_block_static = 'MK_BLK_ST';
 const spf_cp_block_dynamic = 'MK_BLK_DY';
 const spf_cp_assert = 'MK_ASSERT';
+const spf_detach_tracer = 'DETACH_MKR';
 
 const funNamePass = '__PASS_VAL';
 const funNameGetVal = '__GET_VAL';
@@ -150,6 +151,23 @@ function transform(program, option) {
                     // special formの処理
                     if (callee.type == 'Identifier') {
                         switch (callee.name) {
+                            case spf_detach_tracer: {
+                                // validation
+                                if (path.node.arguments.length < 1) {
+                                    throw `SyntaxError: Missing argument ${codePositionStr(path.node)}`
+                                }
+
+                                const exp = path.node.arguments[0];
+                                // メタ情報の引継ぎ
+                                exp.getValMode = path.node.getValMode;
+                                exp.noVallogize = path.node.noVallogize;
+                                exp.pushIdRequest = path.node.pushIdRequest;
+                                exp.cpNames = path.node.cpNames; // 入れ子OK
+                                // pathの繋ぎ変え
+                                path.replaceWith(exp);
+                                path.node.getValMode = true;
+                                return;
+                            }
                             case spf_cp_exp_normal: {
                                 // validation
                                 validateCpExpPath(path);
