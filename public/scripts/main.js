@@ -372,7 +372,7 @@ btnStartDebug.onclick = () => {
         hideTrace: hideTrace,
         query: QUERY,
         LOG: new QUERY.class.Log(vals),
-        clear: () => { VALLOG.data.watchList = []; draw(); return 'OK'; }
+        hideAll: () => { VALLOG.data.watchList = []; draw(); return 'OK'; }
     };
     myCodeMirror.setOption('readOnly', true);
     btnEndDebug.removeAttribute('disabled');

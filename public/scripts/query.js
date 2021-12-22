@@ -46,18 +46,66 @@ QUERY.findValue = () => {
 };
 
 // 値の「生成」に関与した値を検索
-QUERY.findGen = (id) => {
-    let vllg = VALLOG.data.vals[id];
-    if (!vllg) {
-        throw `Invalid id ${id}`;
-    }
-    return vllg.traces[0].relate.map(r => ({id: r.id.id, value: VALLOG.data.vals[r.id.id].value}));
+QUERY.findGen = (...ids) => {
+    const ans = [];
+    ids.forEach(id => {
+        const vllg = VALLOG.data.vals[id];
+        if (!vllg) {
+            return;
+        }
+        const gens = 
+            vllg.traces[0].relate.map(r => ({id: r.id.id, value: VALLOG.data.vals[r.id.id].value}));
+        const ansIds = ans.map(v => v.id);
+        gens.forEach(gen => {
+            if (!ansIds.includes(gen.id)) {
+                ans.push(gen);
+            }
+        });
+    });
+    return ans;
+}
+
+QUERY.findGenAll = (id) => {
+    let ans = [];
+    const queue = [];
+    let curId = id;
+    do {
+        let gens = QUERY.findGen(curId);
+        let ansIds = ans.map(v => v.id);
+        let confirmed = [];
+        gens.forEach(g => {
+            if (!ansIds.includes(g.id)) {
+                confirmed.push(g);
+            }
+        });
+        ans = [...ans, ...confirmed];
+        confirmed.forEach(v => queue.push(v.id));
+        curId = queue.shift();
+    } while(queue.length > 0);
+    return ans;
 }
 
 // 値に関与した値を検索
 QUERY.findRelate = (id) => {
-    
+    throw 'findRelate: Not implemented yet';
 };
+
+QUERY.markerList = (...ids) => {
+    let ans = [];
+    ids.forEach(id => {
+        const vllg = VALLOG.data.vals[id];
+        if (!vllg) {
+            return;
+        }
+        const mkrs = vllg.traces.map(t => t.markers).flat();
+        mkrs.forEach(mkr => {
+            if (!ans.includes(mkr)) {
+                ans.push(mkr);
+            }
+        });
+    });
+    return ans;
+}
 
 /** @type {Log} */
 QUERY.class.Log = class {
@@ -103,21 +151,6 @@ QUERY.class.Log = class {
         });
         return new QUERY.class.Log(ans);
     }
-    nexistMkrHst(mkrl, rel, mkrr) {
-        const pred = QUERY.data.funEnv[rel];
-        if (!pred) {
-            return undefined;
-        }
-        let ans = [];
-        this.#log.forEach(v => {
-            if (v.traces.every(t => {
-                return !pred(t.markers, mkrl, mkrr);
-            })) {
-                ans.push(v);
-            }
-        });
-        return new QUERY.class.Log(ans);
-    }
     forallMkrHst(mkrl, rel, mkrr) {
         const pred = QUERY.data.funEnv[rel];
         if (!pred) {
@@ -127,21 +160,6 @@ QUERY.class.Log = class {
         this.#log.forEach(v => {
             if (v.traces.every(t => {
                 return pred(t.markers, mkrl, mkrr);
-            })) {
-                ans.push(v);
-            }
-        });
-        return new QUERY.class.Log(ans);
-    }
-    nforallMkrHst(mkrl, rel, mkrr) {
-        const pred = QUERY.data.funEnv[rel];
-        if (!pred) {
-            return undefined;
-        }
-        let ans = [];
-        this.#log.forEach(v => {
-            if (v.traces.some(t => {
-                return !pred(t.markers, mkrl, mkrr);
             })) {
                 ans.push(v);
             }
@@ -162,12 +180,21 @@ QUERY.data.funEnv = [];
     env['DURING'] = (mkrs, lhs, rhs) => {
         return !mkrs.includes(lhs) || mkrs.includes(rhs);
     }
+    env['NDURING'] = (mkrs, lhs, rhs) => {
+        return !(env['DURING'](mkrs, lhs, rhs));
+    }
     env['INTERSECT'] = (mkrs, lhs, rhs) => {
         return mkrs.includes(lhs) && mkrs.includes(rhs);
+    }
+    env['NINTERSECT'] = (mkrs, lhs, rhs) => {
+        return !(env['INTERSECT'](mkrs, lhs, rhs));
     }
     env['SEPARATE'] = (mkrs, lhs, rhs) => {
         let or = mkrs.includes(lhs) || mkrs.includes(rhs);
         let and = mkrs.includes(lhs) && mkrs.includes(rhs);
         return or && !and;
+    }
+    env['NSEPARATE'] = (mkrs, lhs, rhs) => {
+        return !(env['SEPARATE'](mkrs, lhs, rhs));
     }
 }
