@@ -88,7 +88,8 @@ function validateCpBlockPath(path) {
 /** 
  * pathに追加で付与するプロパティについて
  * mySkip: これがtrueの場合，それ以下のpathに対してプログラム変換をしないようにする
- * API側で用意されているshouldSkipを使うと何かうまくいかないことがあった（忘れた）ので，代わりにこれを使用
+ * ↑API側で用意されているshouldSkipを使うと何かうまくいかないことがあった（忘れた）ので，代わりにこれを使用
+ * mySkipNode: これがtrueの場合，そのpathに対してプログラム変換をしないようにする
  * 
  * nodeに追加で付与するプロパティについて
  * getValMode: trueの場合，そのnodeを包む追跡子情報取得関数にpassではなくgetValを使う
@@ -105,7 +106,7 @@ function transform(program, option) {
     staticExpCpStack = [];
     staticBlockCpStack = [];
 
-    // オプション設定
+    // オプション設定（未実装）用変数
     const implcpArrayRef = option?.implcp?.arrayRef ?? false;
     const implcpIfTest = option?.implcp?.ifTest ?? false;
 
@@ -114,13 +115,19 @@ function transform(program, option) {
     traverse.default(ast, {
         enter(path) {
             if (path.mySkip) {
-                debugLog('enter: skipped');
+                debugLog(`Enter recursively skipped: ${path.node.type}`);
                 path.shouldSkip = true;
                 return;
             }
+            if (path.mySkipNode) {
+                debugLog(`Enter skipped: ${path.node.type}`);
+                return;
+            }
+            debugLog(`Enter: ${path.node.type}`);
             switch(path.node.type) {
                 case 'FunctionDeclaration': {
-                    debugLog('func enter');
+                    debugLog(`Function name: ${path.node.id.name}`);
+                    // 関数名には付与ポイントを設置しない
                     path.node.id.noVallogize = true;
                     // 仮引数には識別子のみ現れると仮定
                     path.get('params').forEach(p => p.mySkip = true);
@@ -132,7 +139,7 @@ function transform(program, option) {
                 }
                 case 'LogicalExpression':
                 case 'BinaryExpression': {
-                    debugLog(`binexp enter(${path.node.operator})`);
+                    debugLog(`Operator: ${path.node.operator}`);
                     path.node.left.getValMode = true;
                     path.node.right.getValMode = true;
                     return;
@@ -142,11 +149,10 @@ function transform(program, option) {
                     return;
                 }
                 case 'Identifier': {
-                    debugLog(`id enter(${path.node.name})`);
+                    debugLog(`Identifier name: ${path.node.name}`);
                     return;
                 }
                 case 'CallExpression': {
-                    debugLog('callexp enter');
                     const callee = path.node.callee;
                     // special formの処理
                     if (callee.type == 'Identifier') {
@@ -301,10 +307,10 @@ function transform(program, option) {
                     return;
                 }
                 case 'ReturnStatement': {
-                    debugLog('return enter');
                     return;
                 }
                 case 'VariableDeclarator': {
+                    // 右辺には付与ポイントを設置しない
                     path.node.id.noVallogize = true;
                     return;
                 }
@@ -315,6 +321,7 @@ function transform(program, option) {
                     return;
                 }
                 case 'ObjectProperty': {
+                    // オブジェクト式のプロパティは付与ポイントを設置しない
                     path.node.key.noVallogize = true;
                     return;
                 }
@@ -341,15 +348,21 @@ function transform(program, option) {
                     return;
                 }
                 default:
+                    debugLog(`Enter: No instrumentation of ${path.node.type}`);
                     return;
             };
         },
         exit(path) {
             if (path.mySkip) { 
-                debugLog('exit: skipped');
+                debugLog(`Exit recursively skipped: ${path.node.type}`);
                 path.shouldSkip = true;
                 return; 
             }
+            if (path.mySkipNode) {
+                debugLog(`Exit skipped: ${path.node.type}`);
+                return;
+            }
+            debugLog(`Exit: ${path.node.type}`);
             switch(path.node.type) {
                 case 'FunctionDeclaration': {
                     var params = path.node.params.map(x => PassStatAst(x.name, x.loc, '[]'));
@@ -409,10 +422,10 @@ function transform(program, option) {
                 }
                 case 'LogicalExpression':
                 case 'BinaryExpression': {
+                    debugLog(`Operator: ${path.node.operator}`);
                     var id = getId();
                     vallogize(path, id, [path.node.left.relId, path.node.right.relId]);
                     path.node.relId = id;
-                    debugLog(`binexp(logexp) exit(${path.node.operator})`);
                     return;
                 }
                 case 'NewExpression':
@@ -422,10 +435,10 @@ function transform(program, option) {
                 case 'BooleanLiteral':
                 case 'NumericLiteral':
                 case 'Identifier': {
+                    debugLog(`Atom or Symbol: ${path.node.name}`);
                     var id = getId();
                     vallogize(path, id);
                     path.node.relId = id;
-                    debugLog(`id exit(${path.node.name})`);
                     return;
                 }
                 case 'TemplateLiteral': {
@@ -497,7 +510,6 @@ function transform(program, option) {
                     return;
                 }
                 case 'ReturnStatement': {
-                    debugLog('return exit');
                     const argNode = path.node.argument ?? types.identifier('undefined');
                     const tmpVarIdNode = types.identifier(`__DUMMY_${getId()}`);
                     const assignNode = types.assignmentExpression(
@@ -532,6 +544,7 @@ function transform(program, option) {
                     return;
                 }
                 default:
+                    debugLog(`Exit: No instrumentation of ${path.node.type}`);
                     return;
             };
         }
@@ -561,6 +574,7 @@ function transform(program, option) {
     })();`;
 }
 
+// 追跡子付与ポイントを設置のための変換をする
 function vallogize(path, selfId, relIds) {
     if (path.node.noVallogize) {
         path.node.noVallogize = false;
