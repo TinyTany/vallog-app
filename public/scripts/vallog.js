@@ -95,8 +95,8 @@ VALLOG.class.VallogId = class {
     static #__id = 0;
     /** @type {number} */
     #id;
-    constructor() {
-        this.#id = cls.VallogId.#__id++;
+    constructor(id) {
+        this.#id = id ?? cls.VallogId.#__id++;
     }
     get id() {
         return this.#id;
@@ -117,7 +117,7 @@ VALLOG.class.RelateInfo = class {
     /** @type {number} */
     #relateTime;
     constructor(id, time) {
-        this.#relateValId = id;
+        this.#relateValId = new cls.VallogId(id);
         this.#relateTime = time;
     }
     get id() {
