@@ -47,7 +47,7 @@ let staticExpCpStack;
 /** @type {string[][]} */
 let staticBlockCpStack;
 
-const debugMode = false;
+const debugMode = true;
 function debugLog(str) {
     if (debugMode) {
         console.log(str);
@@ -254,6 +254,10 @@ function transform(program, option) {
                     }
                     // 通常の関数呼び出しの場合の処理
                     callee.getValMode = true;
+                    // 関数ポジションがメンバ参照だった場合
+                    if (callee.type == 'MemberExpression') {
+                        callee.noVallogize = true;
+                    }
                     return;
                 }
                 case 'BlockStatement': {
@@ -340,7 +344,10 @@ function transform(program, option) {
                     return;
                 }
                 case 'AssignmentExpression': {
-                    path.node.left.noVallogize = true;
+                    // lhsは変数またはメンバ参照のみを想定
+                    const left = path.node.left;
+                    left.noVallogize = true;
+                    path.node.loc = left.loc;
                     return;
                 }
                 case 'ExpressionStatement': {
@@ -402,22 +409,9 @@ function transform(program, option) {
                     return;
                 }
                 case 'AssignmentExpression': {
-                    // HACK: 副作用を起こすgetterに対して不適切な実装
-                    var lhs = path.node.left;
-                    var ast = types.callExpression(
-                        types.identifier(funNamePass),
-                        [
-                            lhs,
-                            types.numericLiteral(lhs.loc.start.line),
-                            types.numericLiteral(lhs.loc.start.column),
-                            types.numericLiteral(lhs.loc.end.line),
-                            types.numericLiteral(lhs.loc.end.column),
-                            types.arrayExpression([]),
-                            types.stringLiteral('_'),
-                        ]);
-                    var seq = types.sequenceExpression([path.node, ast]);
-                    path.replaceWith(seq);
-                    path.mySkip = true;
+                    const id = getId();
+                    vallogize(path, id);
+                    path.node.relId = id;
                     return;
                 }
                 case 'LogicalExpression':
@@ -496,12 +490,14 @@ function transform(program, option) {
                         return;
                     }
                     // 通常の関数呼び出しの場合の処理
-                    var id = getId();
-                    var rel = [callee.relId];
+                    const id = getId();
+                    let rel = [callee.relId];
+                    if (callee.type == 'MemberExpression') {
+                        rel = [callee.object.relId];
+                    }
                     path.node.arguments.forEach(a => rel.push(a.relId));
                     vallogize(path, id, rel);
                     path.node.relId = id;
-                    debugLog('callexp exit');
                     return;
                 }
                 case 'BlockStatement': {
