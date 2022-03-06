@@ -1,14 +1,16 @@
+//*
 const parser = window.modules.babel_parser;
 const traverse = window.modules.babel_traverse;
 const generate = window.modules.babel_generator;
 const template = window.modules.babel_template;
 const types = window.modules.babel_types;
-
-// const parser = require('@babel/parser');
-// const traverse = require('@babel/traverse');
-// const generate = require('@babel/generator');
-// const template = require('@babel/template');
-// const types = require('@babel/types');
+/*/
+const parser = require('@babel/parser');
+const traverse = require('@babel/traverse');
+const generate = require('@babel/generator');
+const template = require('@babel/template');
+const types = require('@babel/types');
+//*/
 
 // special form name
 const spf_cp_exp_normal = 'MK_EXP';
@@ -252,12 +254,108 @@ function transform(program, option) {
                             default: break;
                         }
                     }
-                    // 通常の関数呼び出しの場合の処理
-                    callee.getValMode = true;
+                    
                     // 関数ポジションがメンバ参照だった場合
                     if (callee.type == 'MemberExpression') {
-                        callee.noVallogize = true;
+                        if (path.node.myVisited) {
+                            return;
+                        }
+                        if (callee.computed) {
+                            // ブラケット記法の場合
+                            const calleeLoc = callee.loc; // あとで使う
+                            const nodeLoc = path.node.loc; // あとで使う
+                            const tmp1 = types.identifier(`__DUMMY_${getId()}`); // exp1
+                            const tmp2 = types.identifier(`__DUMMY_${getId()}`); // exp2
+                            const tmp3 = types.identifier(`__DUMMY_${getId()}`); // tmp1[tmp2]
+                            const seq = types.sequenceExpression([
+                                types.assignmentExpression(
+                                    '=',
+                                    tmp1,
+                                    types.cloneNode(callee.object)
+                                ),
+                                types.assignmentExpression(
+                                    '=',
+                                    tmp2,
+                                    types.cloneNode(callee.property)
+                                ),
+                                types.assignmentExpression(
+                                    '=',
+                                    tmp3,
+                                    types.memberExpression(tmp1, tmp2, true)
+                                ),
+                                path.node
+                            ]);
+                            path.get('callee.object').replaceWith(tmp1);
+                            path.get('callee.property').replaceWith(tmp2);
+                            path.replaceWith(seq);
+                            //
+                            // 代入式全体はvallogizeしない
+                            path.node.expressions[0].noVallogize = true;
+                            path.node.expressions[1].noVallogize = true;
+                            path.node.expressions[2].noVallogize = true;
+                            // 代入式左辺の変数はvallogizeしない
+                            path.node.expressions[0].left.noVallogize = true;
+                            path.node.expressions[1].left.noVallogize = true;
+                            path.node.expressions[2].left.noVallogize = true;
+                            // objとpropにはgetvalを使う
+                            path.node.expressions[0].right.getValMode = true;
+                            path.node.expressions[1].right.getValMode = true;
+                            // メンバ式評価時の各部分式はvallogizeしない
+                            path.node.expressions[2].right.object.noVallogize = true;
+                            path.node.expressions[2].right.property.noVallogize = true;
+
+                            path.node.expressions[2].right.loc = calleeLoc;
+                            path.node.expressions[2].right.relIdFixReq = true;
+
+                            path.get('expressions.3.callee').mySkip = true;
+                            path.node.expressions[3].loc = nodeLoc;
+                            path.node.expressions[3].myVisited = true;
+                        }
+                        else {
+                            // ドット記法の場合
+                            const calleeLoc = callee.loc; // あとで使う
+                            const nodeLoc = path.node.loc; // あとで使う
+                            const tmp1 = types.identifier(`__DUMMY_${getId()}`); // exp1
+                            const tmp2 = types.identifier(`__DUMMY_${getId()}`); // tmp1.prop
+                            const seq = types.sequenceExpression([
+                                types.assignmentExpression(
+                                    '=',
+                                    tmp1,
+                                    types.cloneNode(callee.object)
+                                ),
+                                types.assignmentExpression(
+                                    '=',
+                                    tmp2,
+                                    types.memberExpression(tmp1, callee.property, false)
+                                ),
+                                path.node
+                            ]);
+                            path.get('callee.object').replaceWith(tmp1);
+                            path.replaceWith(seq);
+                            //
+                            // 代入式全体はvallogizeしない
+                            path.node.expressions[0].noVallogize = true;
+                            path.node.expressions[1].noVallogize = true;
+                            // 代入式左辺の変数はvallogizeしない
+                            path.node.expressions[0].left.noVallogize = true;
+                            path.node.expressions[1].left.noVallogize = true;
+                            // objにはgetvalを使う
+                            path.node.expressions[0].right.getValMode = true;
+                            // メンバ式評価時の各部分式はvallogizeしない
+                            path.node.expressions[1].right.object.noVallogize = true;
+                            path.node.expressions[1].right.property.noVallogize = true;
+
+                            path.node.expressions[1].right.loc = calleeLoc;
+                            path.node.expressions[1].right.relIdFixReq = true;
+
+                            path.get('expressions.2.callee').mySkip = true;
+                            path.node.expressions[2].loc = nodeLoc;
+                            path.node.expressions[2].myVisited = true;
+                        }
+                        return;
                     }
+                    // 通常の関数呼び出しの場合の処理
+                    callee.getValMode = true;
                     return;
                 }
                 case 'BlockStatement': {
@@ -319,7 +417,11 @@ function transform(program, option) {
                     return;
                 }
                 case 'MemberExpression': {
-                    path.node.property.noVallogize = !path.node.computed;
+                    // HACK: calleeがメンバ参照式の場合の関数呼び出し式でのast操作に影響を与えないように...
+                    // というか，noVallogizeを書き換えるという使い方は想定していないので，本来であれば毎回このようにすべき
+                    if (!path.node.property.noVallogize) {
+                        path.node.property.noVallogize = !path.node.computed;
+                    }
                     path.node.property.getValMode = true;
                     path.node.object.getValMode = true;
                     return;
@@ -352,6 +454,10 @@ function transform(program, option) {
                 }
                 case 'ExpressionStatement': {
                     // void関数呼出の返値undefinedなどにも不要な追跡子が付くが，それでよい
+                    return;
+                }
+                case 'UpdateExpression': {
+                    path.node.argument.getValMode = true;
                     return;
                 }
                 default:
@@ -493,7 +599,7 @@ function transform(program, option) {
                     const id = getId();
                     let rel = [callee.relId];
                     if (callee.type == 'MemberExpression') {
-                        rel = [callee.object.relId];
+                        rel = [path.getPrevSibling().node.right.relId];
                     }
                     path.node.arguments.forEach(a => rel.push(a.relId));
                     vallogize(path, id, rel);
@@ -524,9 +630,12 @@ function transform(program, option) {
                 }
                 case 'MemberExpression': {
                     var id = getId();
-                    var rel = undefined;
+                    var rel = [path.node.object.relId];
                     if (path.node.computed) {
                         rel = [path.node.object.relId, path.node.property.relId];
+                    }
+                    if (path.node.relIdFixReq) {
+                        rel = path.parentPath.getAllPrevSiblings().map(p => p.node.right.relId);
                     }
                     vallogize(path, id, rel);
                     path.node.relId = id;
@@ -537,6 +646,12 @@ function transform(program, option) {
                 case 'DoWhileStatement':
                 case 'ForStatement': {
                     testExpIdStack.pop();
+                    return;
+                }
+                case 'UpdateExpression': {
+                    const id = getId();
+                    vallogize(path, id, [path.node.argument.relId]);
+                    path.node.relId = id;
                     return;
                 }
                 default:
@@ -573,7 +688,6 @@ function transform(program, option) {
 // 追跡子付与ポイントを設置のための変換をする
 function vallogize(path, selfId, relIds) {
     if (path.node.noVallogize) {
-        path.node.noVallogize = false;
         return;
     }
     var funcName = funNamePass;
