@@ -38,11 +38,11 @@ QUERY.findValue = () => {
             return true;
         });
         if (res) {
-            found.push({id: v.id, value: v.value});
+            found.push(v);
         }
     });
 
-    return found;
+    return new QUERY.class.Log(found);
 };
 
 // 値の「生成」に関与した値を検索
@@ -54,7 +54,7 @@ QUERY.findGen = (...ids) => {
             return;
         }
         const gens = 
-            vllg.traces[0].relate.map(r => ({id: r.id, value: VALLOG.data.vals[r.id].value}));
+            vllg.traces[0].relate.map(r => VALLOG.data.vals[r.id]);
         const ansIds = ans.map(v => v.id);
         gens.forEach(gen => {
             if (!ansIds.includes(gen.id)) {
@@ -62,9 +62,10 @@ QUERY.findGen = (...ids) => {
             }
         });
     });
-    return ans;
+    return new QUERY.class.Log(ans);
 }
 
+// TODO: findGenの使用を変えたのでこの実装だと動かないので修正する
 QUERY.findGenAll = (id) => {
     let ans = [];
     const queue = [];
@@ -107,6 +108,16 @@ QUERY.markerList = (...ids) => {
     return ans;
 }
 
+QUERY.filterValue = (pred) => {
+    let ans = [];
+    VALLOG.data.vals.forEach(v => {
+        if(pred(v.value)) {
+            ans.push(v);
+        }
+    });
+    return new QUERY.class.Log(ans);
+}
+
 /** @type {Log} */
 QUERY.class.Log = class {
     /** @type {Vallog[]} */
@@ -136,10 +147,10 @@ QUERY.class.Log = class {
         });
         return new QUERY.class.Log(ans);
     }
-    existMkrHst(mkrl, rel, mkrr) {
+    mkrSomeTime(mkrl, rel, mkrr) {
         const pred = QUERY.data.funEnv[rel];
         if (!pred) {
-            return undefined;
+            throw `mkrSometimes: Invalid relation name ${rel}`;
         }
         let ans = [];
         this.#log.forEach(v => {
@@ -151,10 +162,10 @@ QUERY.class.Log = class {
         });
         return new QUERY.class.Log(ans);
     }
-    forallMkrHst(mkrl, rel, mkrr) {
+    mkrEveryTime(mkrl, rel, mkrr) {
         const pred = QUERY.data.funEnv[rel];
         if (!pred) {
-            return undefined;
+            throw `mkrAlways: Invalid relation name ${rel}`;
         }
         let ans = [];
         this.#log.forEach(v => {
@@ -177,24 +188,28 @@ QUERY.class.Log = class {
 QUERY.data.funEnv = [];
 {
     const env = QUERY.data.funEnv;
-    env['DURING'] = (mkrs, lhs, rhs) => {
-        return !mkrs.includes(lhs) || mkrs.includes(rhs);
-    }
-    env['NDURING'] = (mkrs, lhs, rhs) => {
-        return !(env['DURING'](mkrs, lhs, rhs));
-    }
-    env['INTERSECT'] = (mkrs, lhs, rhs) => {
+    env['AND'] = (mkrs, lhs, rhs) => {
         return mkrs.includes(lhs) && mkrs.includes(rhs);
     }
-    env['NINTERSECT'] = (mkrs, lhs, rhs) => {
-        return !(env['INTERSECT'](mkrs, lhs, rhs));
+    env['NAND'] = (mkrs, lhs, rhs) => {
+        return !(env['AND'](mkrs, lhs, rhs));
     }
-    env['SEPARATE'] = (mkrs, lhs, rhs) => {
-        let or = mkrs.includes(lhs) || mkrs.includes(rhs);
-        let and = mkrs.includes(lhs) && mkrs.includes(rhs);
-        return or && !and;
+    env['OR'] = (mkrs, lhs, rhs) => {
+        return mkrs.includes(lhs) || mkrs.includes(rhs);
     }
-    env['NSEPARATE'] = (mkrs, lhs, rhs) => {
-        return !(env['SEPARATE'](mkrs, lhs, rhs));
+    env['NOR'] = (mkrs, lhs, rhs) => {
+        return !(env['OR'](mkrs, lhs, rhs));
+    }
+    env['XOR'] = (mkrs, lhs, rhs) => {
+        return env['OR'](mkrs, lhs, rhs) && env['NAND'](mkrs, lhs, rhs);
+    }
+    env['XNOR'] = (mkrs, lhs, rhs) => {
+        return !(env['XOR'](mkrs, lhs, rhs));
+    }
+    env['->'] = (mkrs, lhs, rhs) => {
+        return !mkrs.includes(lhs) && mkrs.includes(rhs);
+    }
+    env['!->'] = (mkrs, lhs, rhs) => {
+        return !(env['->'](mkrs, lhs, rhs));
     }
 }
