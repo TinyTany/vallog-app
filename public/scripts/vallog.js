@@ -194,7 +194,10 @@ VALLOG.function.makeTrace = (line1, char1, line2, char2, rels, cps) => {
         new cls.Location(line1, char1),
         new cls.Location(line2, char2)
     );
-    let relInfos = rels.map(vllg => new cls.RelateInfo(vllg.id, vllg.traces.length - 1));
+    // filter(o => o)は，relsに含まれるundefinedを除外するために使用
+    // 演算子&&や||で短絡評価が起こった場合，その右辺の値を生成源としてREFから
+    // 取り出そうとするとundefinedが発生して実行が進んでしまうので，それへの対処
+    let relInfos = rels.filter(o => o).map(vllg => new cls.RelateInfo(vllg.id, vllg.traces.length - 1));
     let markers = cps ?? [];
     markers = [...markers, ...data.dynamicCpStack];
     return new cls.Trace(locPair, relInfos, markers);
