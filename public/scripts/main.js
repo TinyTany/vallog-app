@@ -371,6 +371,11 @@ btnStartDebug.onclick = () => {
         showTrace: showTrace,
         hideTrace: hideTrace,
         query: QUERY,
+        // 修論の仕様に合わせる（query.findGenなどとせずに利用可能にしておく）
+        filterValue: QUERY.filterValue,
+        findGen: QUERY.findGen,
+        findValue: QUERY.findValue,
+        //
         LOG: new QUERY.class.Log(vals),
         hideAll: () => { VALLOG.data.watchList = []; draw(); return 'OK'; }
     };
